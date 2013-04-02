@@ -33,3 +33,9 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+env/*
+gi/*
+*~
+*.DS_Store
+static/js/vendor/*
