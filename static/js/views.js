@@ -1,3 +1,5 @@
+// javascript:debugger;
+
 App.Views.AppView = Backbone.View.extend({
 
 });
@@ -71,7 +73,6 @@ App.Views.LoginView = Backbone.View.extend({
 		e.preventDefault();
 		$.post('/login', this.$el.serialize(), function (resp) {
 			console.log(resp);
-			resp = JSON.parse(resp);
 
 			if (resp.status == "ok" && resp.username) {
 				window.App.User = new App.Models.User({ username: resp.username });
