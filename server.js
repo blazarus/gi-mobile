@@ -58,10 +58,14 @@ app.post('/logout', function (req, res) {
 });
 
 app.get('/checklogin', function (req, res) {
+	clog("checking login");
 	if (req.session.username) {
+		clog("User already logged in");
 		res.json({status: 'ok', username: req.session.username });
+	} else {
+		clog("User not logged in");
+		res.json({status: 'no_login'});
 	}
-	res.json({status: 'no_login'});
 });
 
 app.get('/*', function(req, res){

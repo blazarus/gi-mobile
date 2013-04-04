@@ -1,21 +1,22 @@
 // javascript:debugger;
 
 App.Routers.main = Backbone.Router.extend({
-	
+
 	routes: {
 		"": "index",
 		"messages/view": "listMessages",
 		"login": "showLogin",
-		"messages/post": "postMessage"
+		"messages/post": "postMessage",
+		"locate": "locate"
 	},
 
-	requiresLogin: ["listMessages", "postMessage"],
+	requiresLogin: ["listMessages", "postMessage", "locate"],
 
 	initialize: function () {
-		
+
 		this.wrapRoutes();
-		
-		
+
+
 		var _this = this;
 		// router doesn't automatically catch normal links
 		$(document).on("click", "a[href^='/']", function (e) {
@@ -133,6 +134,18 @@ App.Routers.main = Backbone.Router.extend({
 		App.userInfoView = new App.Views.UserView({ model: App.User });
 
 		App.postMsgView = new App.Views.PostMessageView();
+	},
+
+	locate: function () {
+		console.log("navigating to locate user", window.App.Templates.locate);
+		$(".container").html($(window.App.Templates.locate));
+
+		console.log("App.User:", App.User);
+		App.userInfoView = new App.Views.UserView({ model: App.User });
+
+		App.followingUsers = new App.Collections.FollowingList();
+		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
+
 	},
 
 	showLogin: function() {

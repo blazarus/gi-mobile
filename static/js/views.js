@@ -1,4 +1,4 @@
-// javascript:debugger;
+// javascript:debugger
 
 App.Views.AppView = Backbone.View.extend({
 
@@ -7,20 +7,26 @@ App.Views.AppView = Backbone.View.extend({
 App.Views.MessageView = Backbone.View.extend({
 	tagName:  "li",
 
-    initialize: function () {
-    },
+	initialize: function () {
+	},
 
-    template: function () {
-    	return _.template(window.App.Templates.message);
-    },
-    
+	template: function () {
+		return _.template(window.App.Templates.message);
+	},
+	
 
 	render: function () {
 		console.log("attributes:", this.model.attributes);
 		var tplt = this.template()(this.model.attributes);
 		
-		this.$el = $(tplt);
-    	return this;
+		if (!!this.$el) {
+			// Element exists, so just update the html
+			this.$el.html(tplt);
+		} else {
+			// Element not yet created, so create it
+			this.$el = $(tplt);
+		}
+		return this;
 	}
 });
 
@@ -96,6 +102,105 @@ App.Views.UserView = Backbone.View.extend({
 
 	render: function () {
 		this.$("#username").text(this.model.get('username'));
-		this.$("#curr_loc").text(this.model.get('location'));
+		this.$("#currloc").text(this.model.get('location'));
+
+		return this;
 	}
+});
+
+App.Views.LocateListElemView = Backbone.View.extend({
+	tagName: "li",
+
+	events: {
+		"click .remove": "removeUser"
+	},
+
+	initialize: function () {
+		console.log("Initializing LocateListElemView");
+
+		this.listenTo(this.model, 'change', this.render);
+		this.render();
+	},
+
+	removeUser: function (e) {
+		this.model.destroy();
+	},
+
+	template: function () {
+		return _.template(window.App.Templates.locateListElem);
+	},
+	
+
+	render: function () {
+		console.log("rendering locate list elem view with attributes:", this.model.attributes);
+		var tplt = this.template()(this.model.attributes);
+		
+		if (!!this.$el) {
+			// Element exists, so just update the html
+			this.$el.html(tplt);
+		} else {
+			// Element not yet created, so create it
+			this.$el = $(tplt);
+		}
+		return this;
+	}
+});
+
+App.Views.LocateUserView = Backbone.View.extend({
+	el: "#locate",
+
+	events: {
+		"submit #add-user": "addUser"
+	},
+
+	subviews: [],
+
+	initialize: function () {
+		console.log("Initializing LocateUserView");
+
+		this.listenTo(this.collection, 'add remove', this.render);
+
+		this.render();
+	},
+
+	addUser: function (e) {
+		e.preventDefault();
+		var uname = this.$("#add-user input#username").val();
+		console.log("Trying to add user:", uname);
+		var newUser = new App.Models.User({username: uname});
+		console.log("newUser:", newUser);
+		this.collection.add(newUser);
+		this.$("#add-user input#username").val("").focus();
+		return this;
+	},
+
+	render: function () {
+		console.log("Rendering locate user view");
+		var users = this.collection;
+		this.$("#userlist").empty();
+
+		_.each(this.subviews, function (subview) {
+			subview.remove();
+		});
+		// Now clear the subview list
+		this.subviews.length = 0;
+
+		if (users.length == 0) {
+			this.$("#userlist").html("No users added yet");
+		} else {
+			// Improve performance by not doing append for each list elem,
+			// which causes a page reflow each time
+			var container = $(document.createDocumentFragment()); 
+			// render each subview, appending to our root element
+			users.each( function (user) {
+
+				var subview = new App.Views.LocateListElemView({model:user});
+				var el = subview.render().$el;
+				container.append(el);
+			});
+			this.$("#userlist").append(container);
+		}
+		return this;
+	}
+
 });
