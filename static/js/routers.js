@@ -134,6 +134,16 @@ App.Routers.main = Backbone.Router.extend({
 		App.userInfoView = new App.Views.UserView({ model: App.User });
 
 		App.postMsgView = new App.Views.PostMessageView();
+
+		// TODO: This should probably be done with models and views
+		$.getJSON('/locations/all', function (resp) {
+			console.log("Response from all locations:", resp);
+			var container = $(document.createDocumentFragment()); 
+			for (var i=0, loc; loc=resp[i]; i++) {
+				container.append($("<option>").attr("value", loc).text(loc));
+			}
+			$("#compose-message #loc").append(container);
+		});
 	},
 
 	locate: function () {

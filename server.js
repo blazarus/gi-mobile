@@ -3,7 +3,10 @@ var express = require('express'),
 	request = require('request'),
 	path = require('path'),
 	fs = require('fs'),
-	app = express();
+	app = express(),
+	http = require('http'),
+	server = http.createServer(app),
+	io = require('socket.io').listen(server);
 
 var mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/gi_companion');
@@ -52,9 +55,29 @@ app.post('/login', function (req, res) {
 
 });
 
-app.post('/logout', function (req, res) {
+
+app.get('/logout', function (req, res) {
 	req.session.destroy();
+	clog("logging out user");
 	res.redirect('/login');
+});
+
+app.get('/checkuser', function (req, res) {
+	var uname = req.param('username');
+	clog("checking username:", uname);
+	if (uname) {
+		request.get('http://data.media.mit.edu/spm/contacts/json?username='+uname, function (err, response, body) {
+			var jsono;
+			if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
+				res.json({ status: 'ok', username: req.session.username });
+			} else {
+				res.json({ status: 'error', 'msg': 'Could not validate username'});
+			}
+		});
+	} else {
+		res.json({ status: 'error', 'msg': 'No username provided'});
+	}
+
 });
 
 app.get('/checklogin', function (req, res) {
@@ -66,6 +89,21 @@ app.get('/checklogin', function (req, res) {
 		clog("User not logged in");
 		res.json({status: 'no_login'});
 	}
+});
+
+app.post('/messages/create', function (req, res) {
+	clog("got here", req.body);
+});
+
+app.get('/locations/all', function (req, res) {
+	Location.find( function (err, locs) {
+		if (err) clog("Error getting locations:", err);
+		clog("Locations:", locs);
+		locs = _.map(locs, function (loc, idx) {
+			return loc.name; // front end only needs the names
+		})
+		res.json(locs);
+	});
 });
 
 app.get('/*', function(req, res){
@@ -90,6 +128,13 @@ app.get('/*', function(req, res){
 // 		res.send(t);
 // 	});
 // });
+
+io.sockets.on('connection', function (socket) {
+	socket.emit('news', { hello: 'world' });
+	socket.on('my other event', function (data) {
+		console.log(data);
+	});
+});
 
 var Schema = mongoose.Schema;
 
@@ -153,6 +198,6 @@ var addUsers = function () {
 
 
 
-app.listen(8080);
+server.listen(8080);
 
 console.log("Server listening on 8080");

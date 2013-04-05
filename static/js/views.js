@@ -58,7 +58,7 @@ App.Views.PostMessageView = Backbone.View.extend({
 	submitMessage: function (e) {
 		e.preventDefault();
 		console.log($("form").serialize())
-		$.post('/messages/post', $("form").serialize(), function (resp) {
+		$.post('/messages/create', $("form").serialize(), function (resp) {
 			console.log("resp:", resp);
 		});
 	}
@@ -81,7 +81,10 @@ App.Views.LoginView = Backbone.View.extend({
 			console.log(resp);
 
 			if (resp.status == "ok" && resp.username) {
-				window.App.User = new App.Models.User({ username: resp.username });
+				window.App.User = new App.Models.User({ 
+					username: resp.username, 
+					validated: true // No need to do another check of the username
+				});
 				window.App.router.navigate("", { trigger: true });
 			} else {
 				alert(resp.msg);
