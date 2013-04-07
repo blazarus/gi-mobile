@@ -82,6 +82,9 @@ App.Routers.main = Backbone.Router.extend({
 							username: resp.username
 						});
 						console.log("User logged in, continue");
+
+						App.EventDispatcher.trigger('login_success');
+
 						return func();
 					} else {
 						// User not logged in, redirect to login page
@@ -106,21 +109,8 @@ App.Routers.main = Backbone.Router.extend({
 
 		$(".container").html($(window.App.Templates.messageList));
 
-		console.log("App.User:", App.User);
-		App.userInfoView = new App.Views.UserView({ model: App.User });
-
-		App.msgs = new App.Collections.Messages();
-
 		App.msgListView = new App.Views.MessageListView({
 			collection: App.msgs
-		});
-
-		App.msgs.fetch({
-			success: function () {
-				console.log("Messages:", App.msgs);
-				App.msgListView.render();
-
-			}
 		});
 
 	},
@@ -129,31 +119,13 @@ App.Routers.main = Backbone.Router.extend({
 		console.log("navigating to post message", window.App.Templates['postMessage']);
 
 		$(".container").html($(window.App.Templates.postMessage));
-
-		console.log("App.User:", App.User);
-		App.userInfoView = new App.Views.UserView({ model: App.User });
-
 		App.postMsgView = new App.Views.PostMessageView();
 
-		// TODO: This should probably be done with models and views
-		$.getJSON('/locations/all', function (resp) {
-			console.log("Response from all locations:", resp);
-			var container = $(document.createDocumentFragment()); 
-			for (var i=0, loc; loc=resp[i]; i++) {
-				container.append($("<option>").attr("value", loc).text(loc));
-			}
-			$("#compose-message #loc").append(container);
-		});
 	},
 
 	locate: function () {
 		console.log("navigating to locate user", window.App.Templates.locate);
 		$(".container").html($(window.App.Templates.locate));
-
-		console.log("App.User:", App.User);
-		App.userInfoView = new App.Views.UserView({ model: App.User });
-
-		App.followingUsers = new App.Collections.FollowingList();
 		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
 
 	},

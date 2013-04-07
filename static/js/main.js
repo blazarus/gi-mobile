@@ -6,7 +6,8 @@ $( function () {
 
 	// Make sure templates are loaded before running main logic
 	// Check if templates have loaded every ten ms
-	blockUntilTrue(checkTemplates, window.App.init, 10);
+	// blockUntilTrue(checkTemplates, window.App.init, 10);
+	window.App.init();
 });
 
 var checkParams = function () {
@@ -28,33 +29,33 @@ var checkParams = function () {
 	}
 }
 
-for (tmpl in window.App.Templates) {
-	(function (tmpl) {
-		// Expects templates to be accessible from /templates/<tmpl>
-		$.get('/templates/' + tmpl + '.html', function (data) {
-			window.App.Templates[tmpl] = data;
-		});
-	})(tmpl); // Pass tmpl in here to seal in value when callback is run
-}
+// for (tmpl in window.App.Templates) {
+// 	(function (tmpl) {
+// 		// Expects templates to be accessible from /templates/<tmpl>
+// 		$.get('/templates/' + tmpl + '.html', function (data) {
+// 			window.App.Templates[tmpl] = data;
+// 		});
+// 	})(tmpl); // Pass tmpl in here to seal in value when callback is run
+// }
 
-var checkTemplates = function () {
-	// Checks if all the templates have been loaded
-	for (tmpl in window.App.Templates) {
-		if (!window.App.Templates[tmpl]) return false;
-	}
-	return true;
-}
+// var checkTemplates = function () {
+// 	// Checks if all the templates have been loaded
+// 	for (tmpl in window.App.Templates) {
+// 		if (!window.App.Templates[tmpl]) return false;
+// 	}
+// 	return true;
+// }
 
-var blockUntilTrue = function (check, func, sleeptime) {
-	/*
-	 * will try check() every <sleeptime> ms
-	 * if it is true, it will break this loop and run func
-	 */
-	if (check()) {
-		func();
-	} else {
-		setTimeout(function () {
-			blockUntilTrue(check, func, sleeptime);
-		}, sleeptime);
-	}
-}
+// var blockUntilTrue = function (check, func, sleeptime) {
+// 	/*
+// 	 * will try check() every <sleeptime> ms
+// 	 * if it is true, it will break this loop and run func
+// 	 */
+// 	if (check()) {
+// 		func();
+// 	} else {
+// 		setTimeout(function () {
+// 			blockUntilTrue(check, func, sleeptime);
+// 		}, sleeptime);
+// 	}
+// }

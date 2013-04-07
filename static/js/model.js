@@ -1,10 +1,26 @@
 // javascript:debugger
+
+App.Models.Location = Backbone.Model.extend({
+	toString: function () {
+		return this.get("name");
+	}
+});
+
 App.Models.Message = Backbone.Model.extend({
 	initialize: function () {
 		
 	},
-	toString: function () {
-		return "Listing:" + this.title;
+
+	parse: function (response) {
+		console.log("got here in parse");
+		response.sender = App.allUsers.getOrCreate(response.sender);
+		response.to = _.map(response.to, function (elem) {
+			return App.allUsers.getOrCreate(elem);
+		});
+		response.triggerLocs = _.map(response.triggerLocs, function (elem) {
+			return new App.Models.Location(elem);
+		});
+		return response;
 	}
 });
 
@@ -106,8 +122,28 @@ App.Models.User = Backbone.Model.extend({
 				}
 			});
 		}
+	},
+
+	toString: function () {
+		return this.get("username");
 	}
 
+});
+
+App.Collections.Users = Backbone.Collection.extend({
+	// Keep track of all the users we know of on the front end
+	model: App.Models.User,
+
+	getOrCreate: function (attrs) {
+		// Factory method for creating users
+		var existingUser = this.findWhere(attrs);
+		if (existingUser) {
+			return existingUser;
+		}
+		var user = new App.Models.User(attrs);
+		this.add(user);
+		return user;
+	}
 });
 
 App.Collections.FollowingList = Backbone.Collection.extend({
@@ -115,10 +151,6 @@ App.Collections.FollowingList = Backbone.Collection.extend({
 
 	initialize: function () {
 		console.log("Initializing followingList");
-		// this.on("destroy", function (e) {
-		// 	console.log("Got the remove event in the collection");
-		// 	javascript:debugger;
-		// });
 
 	}
 });

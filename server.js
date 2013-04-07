@@ -3,6 +3,7 @@ var express = require('express'),
 	request = require('request'),
 	path = require('path'),
 	fs = require('fs'),
+	EventEmitter = require('events').EventEmitter,
 	app = express(),
 	http = require('http'),
 	server = http.createServer(app),
@@ -13,6 +14,8 @@ mongoose.connect('mongodb://localhost/gi_companion');
 
 // alias console.log
 var clog = console.log;
+
+var eventEmitter = new EventEmitter();
 
 app.use(express.logger('dev'));
 app.use(express.bodyParser());
@@ -25,6 +28,12 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
+	// Message.find().populate('sender to triggerLocs').exec( function (err, msgs) {
+	// 	_.each(msgs, function (msg, idx) {
+
+	// 		clog("Message:", msg);
+	// 	});
+	// });
 });
 
 app.post('/login', function (req, res) {
@@ -33,21 +42,27 @@ app.post('/login', function (req, res) {
 		request.get("http://data.media.mit.edu/spm/contacts/json?web_code=" + req.body.webcode, function (err, response, body) {
 			var jsono;
 			if (!err && (jsono = JSON.parse(body)) && jsono.username && !jsono.error) {
-				req.session.username = jsono.username;
-				res.json({ status: 'ok', username: req.session.username });
+				// Either get this username from the DB, or add to DB, then set the session
+				User.findOneAndUpdate({ username: jsono.username }, { username: jsono.username }, { upsert: true }, function (err, theUser) {
+					if (err) {
+						clog("Error creating or getting from DB user:", jsono.username);
+						res.json({ status: "error", msg:"Something went wrong"});
+					} else {
+						clog("Got user from DB:", theUser);
+						req.session.user = theUser;
+						res.json({ status: 'ok', username: req.session.user.username });
+					}
+				});
 			} else {
 				res.json({ status: 'error', 'msg': 'Could not validate webcode'});
 			}
 		});
 	} else if (req.body.username) {
-		request.get("http://data.media.mit.edu/spm/contacts/json?username=" + req.body.username, function (err, response, body) {
-			var jsono;
-			if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
-				req.session.username = req.body.username;
-				res.json({ status: 'ok', username: req.session.username });
-			} else {
-				res.json({ status: 'error', 'msg': 'Could not validate username'});
-			}
+		validateUsername(req.body.username, function (theUser) {
+			req.session.user = theUser;
+			res.json({ status: 'ok', username: req.session.user.username });
+		}, function () {
+			res.json({ status: 'error', 'msg': 'Could not validate username'});
 		});
 	} else {
 		res.json({ status: 'error', msg: 'Need to submit either a webcode or username'});
@@ -66,13 +81,10 @@ app.get('/checkuser', function (req, res) {
 	var uname = req.param('username');
 	clog("checking username:", uname);
 	if (uname) {
-		request.get('http://data.media.mit.edu/spm/contacts/json?username='+uname, function (err, response, body) {
-			var jsono;
-			if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
-				res.json({ status: 'ok', username: req.session.username });
-			} else {
-				res.json({ status: 'error', 'msg': 'Could not validate username'});
-			}
+		validateUsername(uname, function (theUser) {
+			res.json({ status: 'ok', username: theUser.username });
+		}, function () {
+			res.json({ status: 'error', 'msg': 'Could not validate username'});
 		});
 	} else {
 		res.json({ status: 'error', 'msg': 'No username provided'});
@@ -80,11 +92,79 @@ app.get('/checkuser', function (req, res) {
 
 });
 
+var validateUsername = function (uname, success, failure) {
+	// Check with ML if username is valid
+	// Also cache in DB
+	// Calls success with the User object from the DB
+	clog("Validating username:", uname);
+	User.findOne({ username: uname }, function (err, user) {
+		if (!user) {
+			// Not in DB, so check data.media.mit.edu
+			clog("User not in DB, so checking data.media.mit.edu");
+			request.get('http://data.media.mit.edu/spm/contacts/json?username='+uname, function (err, response, body) {
+				var jsono;
+				if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
+					// Valid user, so cache in DB
+					var newUser = new User({ username: uname });
+					newUser.save(function (err, savedUser) {
+						if (err) clog("Error saving ", uname, "in DB:", err);
+						else clog("Saved user in DB:", newUser);
+						success(savedUser);
+					});
+				} else {
+					failure();
+				}
+			});
+		} else {
+			// User already in DB, no need to check data.media.mit.edu
+			clog("Found user in DB:", user);
+			success(user);
+		}
+	});
+	
+};
+
+var validateUserList = function (usernames, success, failure) {
+	// Return success only if all usernames are validated
+	// usernames -> array of Strings
+	// calls success callback with array of User objects from DB as param
+	clog("Checking user list:", usernames);
+	var users = [];
+	var successCallback = function () {
+		clog("All users valid");
+		success(users);
+		eventEmitter.removeListener('users validated', successCallback);
+	};
+	var failureCallback = function (username) {
+		// username: the invalid username
+		clog("Invalide user with username:", username);
+		failure();
+		eventEmitter.removeListener('users not valid', failureCallback);
+	};
+	eventEmitter.on('users validated', successCallback);
+	eventEmitter.on('user not valid', failureCallback);
+
+	var count = 0
+	for (var i=0, uname; uname = usernames[i]; i++) {
+		(function (uname) {
+			validateUsername(uname, function (userObj) {
+				users.push(userObj);
+				if (++count >= usernames.length) {
+					clog("Enough users valid, emit event");
+					eventEmitter.emit('users validated');
+				}
+			}, function () {
+				eventEmitter.emit('user not valid', uname);
+			});
+		})(uname); // seal in value for uname
+	}
+}
+
 app.get('/checklogin', function (req, res) {
 	clog("checking login");
-	if (req.session.username) {
+	if (req.session.user) {
 		clog("User already logged in");
-		res.json({status: 'ok', username: req.session.username });
+		res.json({status: 'ok', username: req.session.user.username });
 	} else {
 		clog("User not logged in");
 		res.json({status: 'no_login'});
@@ -93,6 +173,40 @@ app.get('/checklogin', function (req, res) {
 
 app.post('/messages/create', function (req, res) {
 	clog("got here", req.body);
+	
+	Location.findOne({ name: req.body.loc }, function (err, theLoc) {
+		var sender = req.session.user;
+		
+		var to = req.body['send-to'];
+		var usersToCheck = [to];
+
+		validateUserList(usersToCheck, function (toList) {
+			// Users validated, now create the message
+			clog("List of validated user objects:", toList);
+			clog("Sender:", sender, new User({ username: 'blazarus' }));
+			var msg = new Message({
+				subject: req.body.subject,
+				body: req.body.body,
+				to: toList,
+				sender: sender._id,
+				triggerLocs: theLoc
+			});
+			msg.save(function (err, savedMsg) {
+				if (err) {
+					clog("Error inserting message into DB:", err);
+					res.json({ status: "error", msg: "Something went wrong" });
+				} else {
+					clog("Successfully inserted msg into DB:", savedMsg);
+					eventEmitter.emit("newMsg", savedMsg);
+					res.json({ status: "ok" });
+				}
+			});
+		}, function () {
+			// validating users failed, send error response
+			res.json({status: "error", msg: "Not valid user"});
+		});
+	});
+	
 });
 
 app.get('/locations/all', function (req, res) {
@@ -106,13 +220,20 @@ app.get('/locations/all', function (req, res) {
 	});
 });
 
+app.get('/messages', function (req, res) {
+	clog("Getting messages for user");
+	Message
+		.find({to: req.session.user._id })
+		.populate('sender to triggerLocs')
+		.exec(function (err, msgs) {
+			if (err) clog("Error while retrieving messages:", err);
+			clog("Got messages for", req.session.user.username, msgs);
+			res.json({status: 'ok', 'messages': msgs });
+		});
+});
+
 app.get('/*', function(req, res){
-	// Location.find( function (err, locs) {
-	// 	if (err) console.log("Error:", err);
-	// 	clog(locs);
-	// 	res.send(locs[0].toJSON());
-	// });
-	res.sendfile(__dirname + '/newindex.html');
+	res.sendfile(__dirname + '/index.html');
 });
 // app.get('/templates/:tmpl', function (req, res) {
 // 	var tmpl = req.params.tmpl;
@@ -128,11 +249,43 @@ app.get('/*', function(req, res){
 // 		res.send(t);
 // 	});
 // });
+eventEmitter.on("newMsg", function (msg) {
+	var clients = io.sockets.clients();
+	clog("Currently connected sockets:", _.pluck(clients, 'id'));
+	for (var i=0, socket; socket = clients[i]; i++) {
+		(function (socket) {
+			clog("Event emitted for recently posted message:", msg, socket.id);
+			socket.get('username', function (err, uname) {
+				if (err) clog("Error getting username from socket:", err);
+
+				Message.findOne(msg).populate('sender to triggerLocs').exec(function (err, theMsg) {
+					clog("The message that will be delivered to the client:", uname, theMsg);
+					clog(theMsg.to);
+					if (_.contains(_.pluck(theMsg.to, 'username'), uname)) {
+						clog("passed the test");
+						socket.emit('msg', { msg: theMsg });				
+					} else {
+						clog("Message not sent to this client");
+					}
+				});
+			});
+		})(socket); // seal in value for 'socket'
+	}	
+});
 
 io.sockets.on('connection', function (socket) {
-	socket.emit('news', { hello: 'world' });
-	socket.on('my other event', function (data) {
-		console.log(data);
+	clog("Socket connected:", socket.id);
+	socket.emit('ask_username', {});
+	socket.on('response_username', function (data) {
+		clog("Got response username:", data);
+		socket.set('username', data.username, function () {
+			
+		});
+	});
+
+	
+	socket.on('disconnect', function () {
+		clog("Socket disconnected:", socket.id);
 	});
 });
 
@@ -143,17 +296,16 @@ var LocationSchema = new Schema({
 });
 
 var UserSchema = new Schema({
-	username: { type: String, unique: true, required: true, trim: true },
-	lastLoc: {type: Schema.Types.ObjectId, ref: 'LocationSchema'},
+	username: { type: String, unique: true, required: true, trim: true }
 });
 
 var MessageSchema = new Schema({
 	createdAt: {type: Date, default: Date.now},
 	subject: { type: String, required: true },
 	body: { type: String, required: true },
-	sender: { type: Schema.Types.ObjectId, ref: 'UserSchema', required: true },
-	to: { type: [Schema.Types.ObjectId], ref: 'UserSchema', required: true },
-	triggerLocs: { type: [Schema.Types.ObjectId], ref: 'LocationSchema', required: true },
+	sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+	to: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
+	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
 });
 
 var Location = mongoose.model('Location', LocationSchema);
@@ -162,11 +314,11 @@ var Message = mongoose.model('Message', MessageSchema);
 
 var addLocations = function () {
 	var locNames = [
-				"e14-474-1",
-				"e15-468-1A",
-				"e14-274-1",
-				"NONE"
-			];
+		"e14-474-1",
+		"e15-468-1A",
+		"e14-274-1",
+		"NONE"
+	];
 
 	for (var i=0, name; name=locNames[i]; i++) {
 		(function (name) {
@@ -194,6 +346,14 @@ var addUsers = function () {
 			});
 		})(name);
 	}
+};
+
+var testMessages = function () {
+
+	var blazarus = User.findOne({username: 'blazarus'}, function (err, users) {
+
+		clog("users:", users);
+	});
 };
 
 
