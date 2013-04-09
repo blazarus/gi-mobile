@@ -1,4 +1,11 @@
-<li>
-	<label>Subject: </label><%= subject %>
-	<label>Body: </label><%= body %>
-</li>
+<div class="msg-header">
+	<h4 class="subject"><%= subject %></h4>
+	<span class="pull-right">Created: <%= createdAt %></span>
+	From: <%= sender %><br />
+	To: <%= to %><br />
+	Location: <%= triggerLocs %>
+</div>
+<div class="msg-body well well-small">
+	<%= body %>
+</div>
+

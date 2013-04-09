@@ -5,17 +5,15 @@
 
 	<label for="loc">Location:</label>
 	<select id="loc" name="loc">
-		{% for loc in locs %}
-		<option>{{ loc }}</option>
-  		{% endfor %}
+		
 	</select>
 
 	<!-- <label>Duration</label> -->
 	<label for="subject">Message Subject:</label>
-	<input id="subject" name="subject" type="textarea">
+	<input id="subject" name="subject" type="text">
 
 	<label for="msg-body">Message Body:</label>
 	<textarea id="msg-body" name="body" type="textarea" rows="4" cols="50"></textarea>
 
-	<input type="submit">
+	<input type="submit" class="btn"><button id="clearform" class="btn">Clear</button>
 </form>

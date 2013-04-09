@@ -1,7 +1,12 @@
 // javascript:debugger
 
-App.Views.AppView = Backbone.View.extend({
+App.Views.NewMsgView = Backbone.View.extend({
+	// Deals with popping up new messages
+	el: ".main-content",
 
+	initialize: function () {
+
+	}
 });
 
 App.Views.MessageView = Backbone.View.extend({
@@ -16,7 +21,6 @@ App.Views.MessageView = Backbone.View.extend({
 	
 
 	render: function () {
-		console.log("attributes:", this.model.attributes);
 		var tplt = this.template()(this.model.attributes);
 		
 		if (!!this.$el) {
@@ -33,16 +37,23 @@ App.Views.MessageView = Backbone.View.extend({
 App.Views.MessageListView = Backbone.View.extend({
 	el: "#messages-list",
 
+	initialize: function () {
+		this.listenTo(this.collection, 'change add remove', this.render);
+		this.render();
+	},
+
 	render: function () {
 		console.log("Message List being rendered");
 
+		this.$el.html("");
 		var that = this;
-
+		var container = $(document.createDocumentFragment()); 
+		// render each subview, appending to our root element
 		this.collection.each( function (elem, idx) {
 			var li = new App.Views.MessageView({ model: elem });
-
-			li.render().$el.appendTo(that.$el);
+			li.render().$el.appendTo(container);
 		});
+		that.$el.append(container);
 
 		return this;
 	}
@@ -51,16 +62,38 @@ App.Views.MessageListView = Backbone.View.extend({
 App.Views.PostMessageView = Backbone.View.extend({
 	el: '#compose-message',
 
+	initialize: function () {
+		console.log("Initializing PostMessageView");
+
+		$.getJSON('/locations/all', function (resp) {
+			console.log("Response from all locations:", resp);
+			var container = $(document.createDocumentFragment()); 
+			for (var i=0, loc; loc=resp[i]; i++) {
+				container.append($("<option>").attr("value", loc).text(loc));
+			}
+			$("#compose-message #loc").append(container);
+		});
+	},
+
 	events: {
-		"submit": "submitMessage"
+		"submit": "submitMessage",
+		"click #clearform": "clearForm"
 	},
 
 	submitMessage: function (e) {
+		var _this = this;
 		e.preventDefault();
-		console.log($("form").serialize())
-		$.post('/messages/post', $("form").serialize(), function (resp) {
+		console.log($("form").serialize(), this);
+		$.post('/messages/create', $("form").serialize(), function (resp) {
 			console.log("resp:", resp);
+			if (resp.status == "error") alert(resp.msg);
+			_this.$("input#send-to").select();
 		});
+	},
+
+	clearForm: function () {
+		this.$("input:text, textarea").val("");
+		this.$("input#send-to").focus();
 	}
 });
 
@@ -79,10 +112,12 @@ App.Views.LoginView = Backbone.View.extend({
 		e.preventDefault();
 		$.post('/login', this.$el.serialize(), function (resp) {
 			console.log(resp);
-			resp = JSON.parse(resp);
 
-			if (resp.status == "ok" && resp.username) {
-				window.App.User = new App.Models.User({ username: resp.username });
+			if (resp.status == "ok" && resp.user) {
+				javascript:debugger;
+				window.App.User = App.allUsers.getOrCreate(resp.user);
+				App.User.set("validated", true); // No need to do another check of the username
+				App.EventDispatcher.trigger('login_success');
 				window.App.router.navigate("", { trigger: true });
 			} else {
 				alert(resp.msg);
@@ -102,8 +137,10 @@ App.Views.UserView = Backbone.View.extend({
 	},
 
 	render: function () {
+		this.$el.css('visibility', 'visible');
 		this.$("#username").text(this.model.get('username'));
-		this.$("#currloc").text(this.model.get('location'));
+		var loc = this.model.get('location') || "Searching..."
+		this.$("#currloc").text(loc);
 
 		return this;
 	}
@@ -148,7 +185,7 @@ App.Views.LocateListElemView = Backbone.View.extend({
 });
 
 App.Views.LocateUserView = Backbone.View.extend({
-	el: "#locate",
+	el: ".main-content #locate",
 
 	events: {
 		"submit #add-user": "addUser"
@@ -168,9 +205,10 @@ App.Views.LocateUserView = Backbone.View.extend({
 		e.preventDefault();
 		var uname = this.$("#add-user input#username").val();
 		console.log("Trying to add user:", uname);
-		var newUser = new App.Models.User({username: uname});
+		var newUser = App.allUsers.getOrCreate({username: uname});
 		console.log("newUser:", newUser);
 		this.collection.add(newUser);
+		console.log("followingUsers:", App.followingUsers);
 		this.$("#add-user input#username").val("").focus();
 		return this;
 	},
