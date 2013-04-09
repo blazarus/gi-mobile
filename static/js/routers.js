@@ -10,10 +10,14 @@ App.Routers.main = Backbone.Router.extend({
 		"locate": "locate"
 	},
 
+	urlFor: {
+		// Built by this.buildReverseLookup()
+	},
+
 	requiresLogin: ["listMessages", "postMessage", "locate"],
 
 	initialize: function () {
-
+		this.buildReverseLookup();
 		this.wrapRoutes();
 
 
@@ -35,23 +39,22 @@ App.Routers.main = Backbone.Router.extend({
 		});
 	},
 
+	buildReverseLookup: function () {
+		// Build a reverse lookup table to get url from function
+		for (var frag in this.routes) {
+			var func = this.routes[frag];
+			if (_.contains(this.requiresLogin, func)) {
+				if (!(func in this.urlFor)) {
+					this.urlFor[func] = [];	
+				} 
+				this.urlFor[func].push(frag);
+			}
+		}
+	},
 
 	wrapRoutes: function () {
 		// Update routes that require login
 		// Do this by wrapping the route function with checkLogin
-
-		// Build a reverse lookup table for routes
-		var reverseRoutes = {};
-		for (var frag in this.routes) {
-			var func = this.routes[frag];
-			if (_.contains(this.requiresLogin, func)) {
-				if (!(func in reverseRoutes)) {
-					reverseRoutes[func] = [];	
-				} 
-				reverseRoutes[func].push(frag);
-			}
-		}
-
 		// Now wrap the functions and update the router with the wrapped fns
 		for (var i = 0; i < this.requiresLogin.length; i++) {
 			var fname = this.requiresLogin[i];
@@ -59,8 +62,8 @@ App.Routers.main = Backbone.Router.extend({
 
 			// Need to manually update the function called for that route
 			// Each function could be mapped to by multiple url fragments
-			for (var j = 0; j < reverseRoutes[fname].length; j++) {
-				var frag = reverseRoutes[fname][j];
+			for (var j = 0; j < this.urlFor[fname].length; j++) {
+				var frag = this.urlFor[fname][j];
 				this.route(frag, fname);
 			}
 		}
@@ -76,12 +79,11 @@ App.Routers.main = Backbone.Router.extend({
 				$.getJSON('/checklogin', function (resp) {
 
 					console.log("Response from checklogin:", resp);
-
-					if (resp.status == "ok" && resp.username) {
-						window.App.User = new window.App.Models.User({
-							username: resp.username
-						});
-						console.log("User logged in, continue");
+					javascript:debugger;
+					if (resp.status == "ok" && resp.user) {
+						window.App.User = App.allUsers.getOrCreate(resp.user);
+						App.User.set("validated", true); // No need to do another check of the username
+						console.log("User logged in, continue. The user:", App.User);
 
 						App.EventDispatcher.trigger('login_success');
 
@@ -107,7 +109,9 @@ App.Routers.main = Backbone.Router.extend({
 	listMessages: function () {
 		console.log("navigating to list messages", window.App.Templates['messageList']);
 
-		$(".container").html($(window.App.Templates.messageList));
+		$(".main-content").html($(window.App.Templates.messageList));
+		$("nav li").removeClass("active");
+		$("nav li#viewMessages").addClass("active");
 
 		App.msgListView = new App.Views.MessageListView({
 			collection: App.msgs
@@ -118,22 +122,28 @@ App.Routers.main = Backbone.Router.extend({
 	postMessage: function () {
 		console.log("navigating to post message", window.App.Templates['postMessage']);
 
-		$(".container").html($(window.App.Templates.postMessage));
+		$(".main-content").html($(window.App.Templates.postMessage));
 		App.postMsgView = new App.Views.PostMessageView();
+
+		$("nav li").removeClass("active");
+		$("nav li#postMessages").addClass("active");
 
 	},
 
 	locate: function () {
 		console.log("navigating to locate user", window.App.Templates.locate);
-		$(".container").html($(window.App.Templates.locate));
+		$(".main-content").html($(window.App.Templates.locate));
 		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
+
+		$("nav li").removeClass("active");
+		$("nav li#locate").addClass("active");
 
 	},
 
 	showLogin: function() {
 		console.log("navigating to login", window.App.Templates.login);
 		var tmpl = _.template(window.App.Templates.login)();
-		$(".container").html(tmpl);
+		$(".main-content").html(tmpl);
 		App.loginView = new App.Views.LoginView();
 	}
 

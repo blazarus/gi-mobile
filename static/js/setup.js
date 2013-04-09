@@ -67,8 +67,6 @@ window.App = {
 		App.msgs.fetch({
 			success: function () {
 				console.log("Messages:", App.msgs);
-				App.msgListView.render();
-
 			}
 		});
 

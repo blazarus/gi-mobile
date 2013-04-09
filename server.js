@@ -50,7 +50,7 @@ app.post('/login', function (req, res) {
 					} else {
 						clog("Got user from DB:", theUser);
 						req.session.user = theUser;
-						res.json({ status: 'ok', username: req.session.user.username });
+						res.json({ status: 'ok', user: req.session.user });
 					}
 				});
 			} else {
@@ -60,7 +60,7 @@ app.post('/login', function (req, res) {
 	} else if (req.body.username) {
 		validateUsername(req.body.username, function (theUser) {
 			req.session.user = theUser;
-			res.json({ status: 'ok', username: req.session.user.username });
+			res.json({ status: 'ok', user: req.session.user });
 		}, function () {
 			res.json({ status: 'error', 'msg': 'Could not validate username'});
 		});
@@ -78,7 +78,7 @@ app.get('/logout', function (req, res) {
 });
 
 app.get('/checkuser', function (req, res) {
-	var uname = req.param('username');
+	var uname = req.param('username').toLowerCase().trim();
 	clog("checking username:", uname);
 	if (uname) {
 		validateUsername(uname, function (theUser) {
@@ -96,11 +96,12 @@ var validateUsername = function (uname, success, failure) {
 	// Check with ML if username is valid
 	// Also cache in DB
 	// Calls success with the User object from the DB
+	uname = uname.toLowerCase().trim();
 	clog("Validating username:", uname);
 	User.findOne({ username: uname }, function (err, user) {
 		if (!user) {
 			// Not in DB, so check data.media.mit.edu
-			clog("User not in DB, so checking data.media.mit.edu");
+			clog("User not in DB, so checking data.media.mit.edu for", uname);
 			request.get('http://data.media.mit.edu/spm/contacts/json?username='+uname, function (err, response, body) {
 				var jsono;
 				if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
@@ -164,7 +165,7 @@ app.get('/checklogin', function (req, res) {
 	clog("checking login");
 	if (req.session.user) {
 		clog("User already logged in");
-		res.json({status: 'ok', username: req.session.user.username });
+		res.json({status: 'ok', user: req.session.user });
 	} else {
 		clog("User not logged in");
 		res.json({status: 'no_login'});
@@ -296,7 +297,11 @@ var LocationSchema = new Schema({
 });
 
 var UserSchema = new Schema({
-	username: { type: String, unique: true, required: true, trim: true }
+	username: { type: String, unique: true, required: true, trim: true },
+	readMessages: [{
+		readAt: { type: Date, required: true },
+		message: { type: Schema.Types.ObjectId, ref: Message, required: true }
+	}]
 });
 
 var MessageSchema = new Schema({

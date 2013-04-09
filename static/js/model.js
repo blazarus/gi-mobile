@@ -12,7 +12,6 @@ App.Models.Message = Backbone.Model.extend({
 	},
 
 	parse: function (response) {
-		console.log("got here in parse");
 		response.sender = App.allUsers.getOrCreate(response.sender);
 		response.to = _.map(response.to, function (elem) {
 			return App.allUsers.getOrCreate(elem);
@@ -136,7 +135,7 @@ App.Collections.Users = Backbone.Collection.extend({
 
 	getOrCreate: function (attrs) {
 		// Factory method for creating users
-		var existingUser = this.findWhere(attrs);
+		var existingUser = this.findWhere({ username: attrs.username });
 		if (existingUser) {
 			return existingUser;
 		}

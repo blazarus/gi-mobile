@@ -1,0 +1,71 @@
+
+
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+/* Layout */
+h1, h2 {
+    text-align: center;
+}
+
+#user-info {
+	margin: 8px 0;
+	visibility: hidden;
+}
+
+#login-form {
+    width: 50%;
+    min-width: 300px;
+    margin: auto;
+}
+
+#messages-list {
+	list-style: none;
+	li {
+		@shadow: 9px 8px 10px 0px #ccc;
+		// border-top: 1px solid rgb(230, 230, 230);
+		padding: 10px;
+		border: 1px solid #e6e6e6;
+		margin: 12px auto;
+		-moz-box-shadow: @shadow;
+		-webkit-box-shadow: @shadow;
+		box-shadow: @shadow;
+		.msg-header {
+
+		}
+		.msg-body {
+
+		}
+	}
+}
+
+.main-content {
+	#locate {
+		text-align: center;
+		input[type="submit"] {
+			vertical-align: top;
+		}
+	}
+}
+
+// nav li {
+//     display: inline-block;
+// }
+
+// nav li:not(:last-child):after {
+//     content: " | "
+// }
+
+#compose-message {
+	input, select, textarea {
+	    display: block;
+	}
+}
+
+
+
+
+
+
+

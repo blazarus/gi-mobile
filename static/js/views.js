@@ -1,7 +1,12 @@
 // javascript:debugger
 
-App.Views.AppView = Backbone.View.extend({
+App.Views.NewMsgView = Backbone.View.extend({
+	// Deals with popping up new messages
+	el: ".main-content",
 
+	initialize: function () {
+
+	}
 });
 
 App.Views.MessageView = Backbone.View.extend({
@@ -16,7 +21,6 @@ App.Views.MessageView = Backbone.View.extend({
 	
 
 	render: function () {
-		console.log("attributes:", this.model.attributes);
 		var tplt = this.template()(this.model.attributes);
 		
 		if (!!this.$el) {
@@ -109,11 +113,10 @@ App.Views.LoginView = Backbone.View.extend({
 		$.post('/login', this.$el.serialize(), function (resp) {
 			console.log(resp);
 
-			if (resp.status == "ok" && resp.username) {
-				window.App.User = App.allUsers.getOrCreate({ 
-					username: resp.username, 
-					validated: true // No need to do another check of the username
-				});
+			if (resp.status == "ok" && resp.user) {
+				javascript:debugger;
+				window.App.User = App.allUsers.getOrCreate(resp.user);
+				App.User.set("validated", true); // No need to do another check of the username
 				App.EventDispatcher.trigger('login_success');
 				window.App.router.navigate("", { trigger: true });
 			} else {
@@ -134,8 +137,10 @@ App.Views.UserView = Backbone.View.extend({
 	},
 
 	render: function () {
+		this.$el.css('visibility', 'visible');
 		this.$("#username").text(this.model.get('username'));
-		this.$("#currloc").text(this.model.get('location'));
+		var loc = this.model.get('location') || "Searching..."
+		this.$("#currloc").text(loc);
 
 		return this;
 	}
@@ -180,7 +185,7 @@ App.Views.LocateListElemView = Backbone.View.extend({
 });
 
 App.Views.LocateUserView = Backbone.View.extend({
-	el: "#locate",
+	el: ".main-content #locate",
 
 	events: {
 		"submit #add-user": "addUser"
