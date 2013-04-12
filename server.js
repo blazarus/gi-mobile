@@ -28,12 +28,12 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
-	// Message.find().populate('sender to triggerLocs').exec( function (err, msgs) {
-	// 	_.each(msgs, function (msg, idx) {
-
-	// 		clog("Message:", msg);
-	// 	});
-	// });
+	// User.findOne({username: 'blazarus'}, function (err, user) {
+	// 	user.readMessages = [];
+	// 	user.save(function (err) {
+	// 		clog('ok deleted the read messages', user);
+	// 	})
+	// })
 });
 
 app.post('/login', function (req, res) {
@@ -92,6 +92,19 @@ app.get('/checkuser', function (req, res) {
 
 });
 
+app.get('/user/:id', function (req, res) {
+	clog("Getting user with id:", req.params.id);
+	User.findOne({ _id: req.params.id }, function (err, user) {
+		if (err) {
+			clog("Error retrieving user:", err);
+			res.json({status: 'error', msg: err });
+		} else {
+			clog("Retrieved user:", user);
+			res.json({ status: 'ok', user: user });
+		}
+	});
+});
+
 var validateUsername = function (uname, success, failure) {
 	// Check with ML if username is valid
 	// Also cache in DB
@@ -110,6 +123,7 @@ var validateUsername = function (uname, success, failure) {
 					newUser.save(function (err, savedUser) {
 						if (err) clog("Error saving ", uname, "in DB:", err);
 						else clog("Saved user in DB:", newUser);
+
 						success(savedUser);
 					});
 				} else {
@@ -221,16 +235,136 @@ app.get('/locations/all', function (req, res) {
 	});
 });
 
-app.get('/messages', function (req, res) {
-	clog("Getting messages for user");
+// var filterMessagesRead = function (msgs, req) {
+// 	return filterMessages(false, msgs, req);
+// };
+// var filterMessagesUnread = function (msgs, req) {
+// 	return filterMessages(true, msgs, req);
+// };
+// var filterMessages = function (unread, msgs, req) {
+// 	// unread -> a boolean. If true, filter for unread, if false get read msgs
+// 	clog("Filtering messages. Creatign read message id hash for:", req.session.user.username);
+// 	var readMsgHash = {}; //hash of the id's of read msgs
+// 	for (var i=0, readmsg; readmsg=req.session.user.readMessages[i]; i++) {
+// 		var id = readmsg.message; // pull out the actual message
+// 		clog("id:", id);
+// 		readMsgHash[id] = true;
+// 	}
+// 	clog("readMsgHash:", readMsgHash);
+// 	var filtered = _.filter(msgs, function (elem) {
+// 		if (unread) {
+// 			// Keep the messages that ARE NOT read
+// 			return !(elem._id in readMsgHash);
+// 		} else {
+// 			// Keep the messages that ARE read
+// 			return elem._id in readMsgHash;
+// 		}
+// 	});
+// 	clog("Got messages for", req.session.user.username, filtered.length);
+// 	return filtered;
+// };
+
+app.get('/messages/read/:skip?/:limit?', function (req, res) {
+	clog("Getting read/old messages for user");
+	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
 	Message
 		.find({to: req.session.user._id })
-		.populate('sender to triggerLocs')
+		.where('_id').in(readMsgIds)
+		.sort('-createdAt')
+		.skip(req.params.skip ? req.params.skip : 0)
+		.limit(req.params.limit ? req.params.limit : "")
+		.populate('triggerLocs')
 		.exec(function (err, msgs) {
-			if (err) clog("Error while retrieving messages:", err);
-			clog("Got messages for", req.session.user.username, msgs);
-			res.json({status: 'ok', 'messages': msgs });
+			if (err) clog("Error while retrieving read messages:", err);
+			else {
+				// msgs = filterMessagesRead(msgs, req);
+				res.json({status: 'ok', messages: msgs, total: req.session.user.readMessages.length });
+			}
 		});
+});
+
+app.get('/messages/unread/:skip?/:limit?', function (req, res) {
+	clog("Getting new/unread messages for user");
+	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
+	Message
+		.find({to: req.session.user._id })
+		.where('_id').nin(readMsgIds)
+		.sort('-createdAt')
+		.skip(req.params.skip ? req.params.skip : 0)
+		.limit(req.params.limit ? req.params.limit : "")
+		.populate('triggerLocs')
+		.exec(function (err, msgs) {
+			if (err) clog("Error while retrieving read messages:", err);
+			else {
+				// msgs = filterMessagesUnread(msgs, req);
+				res.json({status: 'ok', 'messages': msgs });
+			}
+		});
+});
+
+app.post('/messages/read/:id', function (req, res) {
+	clog("Message being marked as read:", req.params.id, req.session.user.username, req.session.user.readMessages.length);
+	User.findOne({ username: req.session.user.username }, function (err, user) {
+		if (err) clog("Error retrieving logged in User from DB:", err);
+		Message.findOne({ _id: req.params.id }, function (err, msg) {
+			if (err) clog("Error finding message", msg);
+			user.readMessages.push({
+				message: msg,
+				readAt: new Date()
+			});
+
+			user.save(function (err) {
+				if (err) {
+					clog("Error saving user:", err);
+					res.json({ status: 'error', msg: err });
+				} else {
+					req.session.user = user;
+					clog("Successfully updated read messages:", req.session.user.readMessages.length);
+					res.json({ status: 'ok' });
+				}
+				
+			});
+			
+		});
+		
+	});
+});
+
+app.get('/screen/:screenid/groups', function (req, res) {
+	var screenid = req.params.screenid.trim();
+	clog("Checking groups for screenid:", screenid);
+	var url = "http://tagnet.media.mit.edu/groups?screenid="+screenid;
+	request.get(url, function (err, response, body) {
+		if (err) clog("Got error checking groups:", err);
+		else if (response.statusCode != "200") clog("Bad response code:", response.statusCode);
+		else {
+			clog("Got response:", body);
+			
+		}
+	});
+
+	var url = "http://tagnet.media.mit.edu/get_project_info?projectid="+3489;
+
+	request.get(url, function(err, response, body) {
+		// clog(body);
+	});
+});
+
+app.get('/dummyloc', function (req, res) {
+	res.sendfile(__dirname + '/templates/dummy_location.html');
+});
+
+app.post('/dummyloc/update', function (req, res) {
+	if ('session' in req) {
+		req.session.dummyLoc = req.param('loc');
+		res.json({status: 'ok'});
+	} else res.json({status: 'error'});
+});
+
+app.get('/dummyloc/getloc', function (req, res) {
+	if ('session' in req) {
+		res.json({status: 'ok', loc: req.session.dummyLoc });
+	}
 });
 
 app.get('/*', function(req, res){
@@ -251,6 +385,8 @@ app.get('/*', function(req, res){
 // 	});
 // });
 eventEmitter.on("newMsg", function (msg) {
+	// Loop through all of the connected clients to see if the new message
+	// is relevant for them, and if so send it over socket.io
 	var clients = io.sockets.clients();
 	clog("Currently connected sockets:", _.pluck(clients, 'id'));
 	for (var i=0, socket; socket = clients[i]; i++) {
@@ -299,9 +435,24 @@ var LocationSchema = new Schema({
 var UserSchema = new Schema({
 	username: { type: String, unique: true, required: true, trim: true },
 	readMessages: [{
-		readAt: { type: Date, required: true },
+		readAt: { type: Date, default: Date.now},
 		message: { type: Schema.Types.ObjectId, ref: Message, required: true }
 	}]
+});
+
+UserSchema.pre('save', function (next) {
+	var seen = {};
+
+	for (var i=0, elem; elem=this.readMessages[i]; i++) {
+		elem = elem.message;
+		if (elem in seen) {
+			var err = new Error('This message has aleady been marked read: ' + elem);
+			next(err);
+		} else {
+			seen[elem]=true;
+		}
+	}
+	next();
 });
 
 var MessageSchema = new Schema({

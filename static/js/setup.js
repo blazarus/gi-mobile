@@ -10,7 +10,8 @@ window.App = {
 	Views: {},
 	Templates: {
 		"login": null,
-		"messageList": null,
+		"readMessages": null,
+		"unreadMessages": null,
 		"message": null,
 		"postMessage": null,
 		"locate": null,
@@ -62,11 +63,14 @@ window.App = {
 		
 		App.followingUsers = new App.Collections.FollowingList();
 
-		App.msgs = new App.Collections.Messages();
+		App.unreadMsgs = new App.Collections.UnreadMessages();
+		// App.newMsgView = new App.Views.NewMsg({ collection: App.unreadMsgs });
 
-		App.msgs.fetch({
+		App.unreadMsgs.fetch({
 			success: function () {
-				console.log("Messages:", App.msgs);
+				console.log("Unread messages:", App.unreadMsgs);
+				App.EventDispatcher.trigger('newMsgsLoaded');
+				App.unreadMsgs.loaded = true;
 			}
 		});
 
@@ -83,7 +87,7 @@ window.App = {
 			console.log("Got a new message:", data);
 			App.socket.emit('ack', { status: 'received' });
 
-			App.msgs.add(new App.Models.Message(data.msg, { parse: true }));
+			App.unreadMsgs.unshift(new App.Models.Message(data.msg, { parse: true }));
 		});
 	}
 };

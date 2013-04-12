@@ -1,18 +1,168 @@
 // javascript:debugger
 
-App.Views.NewMsgView = Backbone.View.extend({
+App.Views.ReadMessages = Backbone.View.extend({
+	el: ".main-content",
+
+	events: {
+		"click .pager #newer a": "decreasePage",
+		"click .pager #older a": "increasePage"
+	},
+
+	initialize: function () {
+		this.page = 0;
+		this.lastPage = Math.ceil(this.collection.total/this.options.resultsPerPage)-1;
+
+		// Initial rendering
+		var tplt = this.template();
+		this.$el.empty().html(tplt);
+
+		this.msgListView = new App.Views.MessageList({
+			collection: this.collection,
+			messageView: App.Views.Message
+		});
+	},
+
+	template: function () {
+		return _.template(window.App.Templates.readMessages);
+	},
+
+	increasePage: function () {
+		if (this.page < this.lastPage) {
+			this.page++;
+			this.collection.start += this.options.resultsPerPage;
+			this.collection.end += this.options.resultsPerPage;
+			var _this = this;
+			this.collection.fetch({
+				// pass silent and manually call render, so only done once
+				// instead of for each model added
+				silent: true,
+				success: function () {
+					_this.render();
+				}
+			});
+		}
+	},
+
+	decreasePage: function () {
+		if (this.page > 0) {
+			this.page--;
+			this.collection.start -= this.options.resultsPerPage;
+			this.collection.end -= this.options.resultsPerPage;
+			var _this = this;
+			this.collection.fetch({
+				silent: true,
+				success: function () {
+					_this.render();
+				}
+			});
+		}
+	},
+
+	render: function () {
+		this.$(".pager li").removeClass("disabled");
+		if (this.page == 0) {
+			this.$(".pager #newer").addClass("disabled");
+		} else if (this.page == this.lastPage) {
+			this.$(".pager #older").addClass("disabled");
+		}
+		this.$(".pageNumber").text("Page " + (this.page+1) + " of " + (this.lastPage+1));
+		
+		this.msgListView.render();
+	}
+});
+
+App.Views.MessageList = Backbone.View.extend({
+	el: "#messages-list",
+
+	initialize: function () {
+		this.listenTo(this.collection, 'add remove', this.render);
+
+		this.messageView = this.options.messageView || App.Views.Message;
+	},
+
+	render: function () {
+		console.log("Message List being rendered");
+		this.$el.html("");
+		var that = this;
+		var container = $(document.createDocumentFragment()); 
+		// render each subview, appending to our root element
+		this.collection.each( function (elem, idx) {
+			var li = new that.messageView({ model: elem });
+			li.render().$el.appendTo(container);
+		});
+		that.$el.append(container);
+
+		return this;
+	}
+});
+
+App.Views.NewMsg = Backbone.View.extend({
 	// Deals with popping up new messages
 	el: ".main-content",
 
 	initialize: function () {
+		this.listenTo(this.collection, 'add', this.displayMsg);
+	},
 
+	displayMsg: function (msg) {
+		var readMsgIds = _.pluck(App.User.get('readMessages'),'message');
+		if (!_.contains(readMsgIds, msg.get('_id'))) {
+			// This is a new message, display it then mark it read
+			// TODO check the location
+
+			var tplt = _.template(App.Templates.message)(msg.attributes);
+			var popup = $("<div>").addClass("alert newMsgPopup")
+				.append('<button type="button" class="close" data-dismiss="alert">&times;</button>')
+				.append($(tplt));
+			$("body").prepend(popup);
+			App.User.markMessageRead(msg);
+		}
+		
 	}
 });
 
-App.Views.MessageView = Backbone.View.extend({
+App.Views.NewMessage = Backbone.View.extend({
+	tagName: "li",
+
+	events: {
+		"click .close": "closeMessage"
+	},
+
+	initialize: function () {
+		this.listenTo(this.model, 'change', this.render);
+	},
+
+	template: function () {
+		return _.template(window.App.Templates.message);
+	},
+
+	closeMessage: function () {
+		this.$el.fadeOut('slow');
+		App.User.markMessageRead(this.model);
+	},
+
+	render: function () {
+		var tplt = this.template()(this.model.attributes);
+
+		var popup = $(tplt)
+			.prepend('<button type="button" class="close">&times;</button>');
+
+		if (!!this.$el) {
+			// Element exists, so just update the html
+			this.$el.html(popup.html());
+		} else {
+			// Element not yet created, so create it
+			this.$el = popup;
+		}
+		return this;
+	}
+});
+
+App.Views.Message = Backbone.View.extend({
 	tagName:  "li",
 
 	initialize: function () {
+		this.listenTo(this.model, 'change', this.render);
 	},
 
 	template: function () {
@@ -30,31 +180,6 @@ App.Views.MessageView = Backbone.View.extend({
 			// Element not yet created, so create it
 			this.$el = $(tplt);
 		}
-		return this;
-	}
-});
-
-App.Views.MessageListView = Backbone.View.extend({
-	el: "#messages-list",
-
-	initialize: function () {
-		this.listenTo(this.collection, 'change add remove', this.render);
-		this.render();
-	},
-
-	render: function () {
-		console.log("Message List being rendered");
-
-		this.$el.html("");
-		var that = this;
-		var container = $(document.createDocumentFragment()); 
-		// render each subview, appending to our root element
-		this.collection.each( function (elem, idx) {
-			var li = new App.Views.MessageView({ model: elem });
-			li.render().$el.appendTo(container);
-		});
-		that.$el.append(container);
-
 		return this;
 	}
 });
@@ -105,7 +230,7 @@ App.Views.LoginView = Backbone.View.extend({
 	},
 
 	initialize: function () {
-		// this.listenTo(this.model, 'change', this.render);
+
 	},
 
 	submitLogin: function (e) {
@@ -114,11 +239,10 @@ App.Views.LoginView = Backbone.View.extend({
 			console.log(resp);
 
 			if (resp.status == "ok" && resp.user) {
-				javascript:debugger;
 				window.App.User = App.allUsers.getOrCreate(resp.user);
 				App.User.set("validated", true); // No need to do another check of the username
 				App.EventDispatcher.trigger('login_success');
-				window.App.router.navigate("", { trigger: true });
+				App.router.navigate("", { trigger: true });
 			} else {
 				alert(resp.msg);
 			}
@@ -244,3 +368,19 @@ App.Views.LocateUserView = Backbone.View.extend({
 
 });
 
+App.Views.ProjectBrowser = Backbone.View.extend({
+	el: "#project-browser",
+
+	initialize: function () {
+		this.listenTo(this.model, 'change', this.render);
+		this.render();
+	},
+
+	render: function () {
+		this.$el.html(this.model.get('location'));
+		var url = "screen/" + this.model.get('location') + "/groups";
+		$.getJSON(url, function (resp) {
+			console.log("resp:", resp);
+		});
+	}
+});

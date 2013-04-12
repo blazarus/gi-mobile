@@ -40,22 +40,24 @@
 					<a class="brand" href="#">Media Lab Mobile</a>
 					<nav class="nav-collapse collapse">
 						<ul class="nav">
-							<li id="viewMessages"><a href="/messages/view">View Messages</a></li>
+							<li id="projectBrowser"><a href="/project-browser">Project Browser</a></li>
+							<li id="unreadMessages"><a href="/messages/view/unread">New Messages</a></li>
+							<li id="readMessages"><a href="/messages/view/read">Read Messages</a></li>
 							<li id="postMessages"><a href="/messages/post">Post Message</a></li>
 							<li id="locate"><a href="/locate">Locate</a></li>
 							<li id="logout"><a href="/logout">Logout</a></li>
 						</ul>
 
 					</nav>
-					<div id="user-info" class="pull-right">
-						Logged in as <span id="username"></span> |
-						Current location: <span id="currloc"></span>
-					</div>
+					
 				</div>
 			</div>
 		</header>
 
-		
+		<div id="user-info" class="pull-right">
+			Logged in as <span id="username"></span> |
+			Current location: <span id="currloc"></span>
+		</div>
 
 		<div class="container-fluid">
 			<div class="main-content row-fluid">

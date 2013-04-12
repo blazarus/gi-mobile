@@ -3,23 +3,24 @@
 App.Routers.main = Backbone.Router.extend({
 
 	routes: {
-		"": "index",
-		"messages/view": "listMessages",
 		"login": "showLogin",
+		"": "index",
+		"messages/view/unread": "unreadMessages",
+		"messages/view/read": "readMessages",
 		"messages/post": "postMessage",
-		"locate": "locate"
+		"locate": "locate",
+		"project-browser": "browseProjects"
 	},
 
 	urlFor: {
 		// Built by this.buildReverseLookup()
 	},
 
-	requiresLogin: ["listMessages", "postMessage", "locate"],
+	requiresLogin: ["browseProjects", "unreadMessages", "readMessages", "postMessage", "locate"],
 
 	initialize: function () {
 		this.buildReverseLookup();
 		this.wrapRoutes();
-
 
 		var _this = this;
 		// router doesn't automatically catch normal links
@@ -79,7 +80,6 @@ App.Routers.main = Backbone.Router.extend({
 				$.getJSON('/checklogin', function (resp) {
 
 					console.log("Response from checklogin:", resp);
-					javascript:debugger;
 					if (resp.status == "ok" && resp.user) {
 						window.App.User = App.allUsers.getOrCreate(resp.user);
 						App.User.set("validated", true); // No need to do another check of the username
@@ -103,20 +103,70 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	index: function () {
-		this.navigate("messages/view", { trigger: true });
+		this.navigate("messages/view/read", { trigger: true });
 	},
 
-	listMessages: function () {
-		console.log("navigating to list messages", window.App.Templates['messageList']);
+	browseProjects: function () {
+		// $()
+		// var screenid = App.User.get('location');
+		// javascript:debugger;
+		// console.log("HAHAHAHAHAH", App.User.get("location"));
+		// console.log("HAHAHAHAHAH", App.User);
+		$(".main-content").html($("<div>").attr("id", "project-browser"));
+		App.projectBrowserView = new App.Views.ProjectBrowser({ model: App.User });
 
-		$(".main-content").html($(window.App.Templates.messageList));
 		$("nav li").removeClass("active");
-		$("nav li#viewMessages").addClass("active");
+		$("nav li#projectBrowser").addClass("active");
+	},
 
-		App.msgListView = new App.Views.MessageListView({
-			collection: App.msgs
+	unreadMessages: function () {
+		console.log("Navigating to unread/new messages");
+
+		$(".main-content").html($(window.App.Templates.unreadMessages));
+		$("nav li").removeClass("active");
+		$("nav li#unreadMessages").addClass("active");
+
+		// If unreadMsgs already loaded, create view immediately,
+		// otherwise wait for them to be loaded
+		if (App.unreadMsgs.loaded) {
+			App.newMsgListView = new App.Views.MessageList({
+				collection: App.unreadMsgs,
+				messageView: App.Views.NewMessage
+			}).render();
+		} else {
+			App.EventDispatcher.on('newMsgsLoaded', function () {
+				App.newMsgListView = new App.Views.MessageList({
+					collection: App.unreadMsgs,
+					messageView: App.Views.NewMessage
+				}).render();
+			});
+		}
+		
+	},
+
+	readMessages: function () {
+		console.log("navigating to old/read messages");
+
+		$("nav li").removeClass("active");
+		$("nav li#readMessages").addClass("active");
+
+		var resultsPerPage = 10;
+
+		App.readMsgs = new App.Collections.ReadMessages([], {
+			start: 0,
+			end: resultsPerPage
 		});
 
+		App.readMsgs.fetch({
+			success: function () {
+				console.log("Read messages:", App.readMsgs);
+				App.readMsgsView = new App.Views.ReadMessages({
+					collection: App.readMsgs,
+					resultsPerPage: resultsPerPage
+				})
+				.render();
+			}
+		});
 	},
 
 	postMessage: function () {
@@ -140,17 +190,17 @@ App.Routers.main = Backbone.Router.extend({
 
 	},
 
-	locate: function () {
-		console.log("navigating to locate user", window.App.Templates.locate);
-		$(".container").html($(window.App.Templates.locate));
+	// locate: function () {
+	// 	console.log("navigating to locate user", window.App.Templates.locate);
+	// 	$(".main-content").html($(window.App.Templates.locate));
 
-		console.log("App.User:", App.User);
-		App.userInfoView = new App.Views.UserView({ model: App.User });
+	// 	console.log("App.User:", App.User);
+	// 	App.userInfoView = new App.Views.UserView({ model: App.User });
 
-		App.followingUsers = new App.Collections.FollowingList();
-		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
+	// 	App.followingUsers = new App.Collections.FollowingList();
+	// 	App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
 
-	},
+	// },
 
 	showLogin: function() {
 		console.log("navigating to login", window.App.Templates.login);
