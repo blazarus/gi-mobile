@@ -1,11 +1,5 @@
 // javascript:debugger
 
-App.Models.Location = Backbone.Model.extend({
-	toString: function () {
-		return this.get("name");
-	}
-});
-
 App.Models.Message = Backbone.Model.extend({
 	initialize: function () {
 		// If the users' properties change, fire a change event
@@ -222,5 +216,26 @@ App.Collections.FollowingList = Backbone.Collection.extend({
 
 	}
 });
+
+
+App.Models.Location = Backbone.Model.extend({
+	toString: function () {
+		return this.get("screenid");
+	}
+});
+
+App.Collections.Locations = Backbone.Collection.extend({
+	url: '/locations/all',
+
+	initialize: function () {
+
+	},
+
+	parse: function (response) {
+		return response.locs;
+	}
+});
+
+
 
 

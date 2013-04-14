@@ -7,13 +7,20 @@ var express = require('express'),
 	app = express(),
 	http = require('http'),
 	server = http.createServer(app),
+	models = require('./models'),
 	io = require('socket.io').listen(server);
 
-var mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/gi_companion');
+// var mongoose = require('mongoose');
+// mongoose.connect('mongodb://localhost/gi_companion');
 
 // alias console.log
 var clog = console.log;
+
+var Location = models.Location,
+	Group    = models.Group,
+	Project  = models.Project,
+	User     = models.User,
+	Message  = models.Message;
 
 var eventEmitter = new EventEmitter();
 
@@ -23,18 +30,6 @@ app.use(express.cookieParser('\n\x0c\x86~E\\\xfe\xe1\xc5m\xd1#\x90\xfaQD\x1d\xc6
 app.use(express.session());
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
 app.use(express.static(path.join(__dirname, 'static')));
-
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function callback () {
-	clog("Connected to DB");
-	// User.findOne({username: 'blazarus'}, function (err, user) {
-	// 	user.readMessages = [];
-	// 	user.save(function (err) {
-	// 		clog('ok deleted the read messages', user);
-	// 	})
-	// })
-});
 
 app.post('/login', function (req, res) {
 	clog("The request form:", req.body);
@@ -46,12 +41,12 @@ app.post('/login', function (req, res) {
 				User.findOneAndUpdate({ username: jsono.username }, { username: jsono.username }, { upsert: true }, function (err, theUser) {
 					if (err) {
 						clog("Error creating or getting from DB user:", jsono.username);
-						res.json({ status: "error", msg:"Something went wrong"});
-					} else {
-						clog("Got user from DB:", theUser);
-						req.session.user = theUser;
-						res.json({ status: 'ok', user: req.session.user });
+						return res.json({ status: "error", msg:"Something went wrong"});
 					}
+
+					clog("Got user from DB:", theUser);
+					req.session.user = theUser;
+					res.json({ status: 'ok', user: req.session.user });
 				});
 			} else {
 				res.json({ status: 'error', 'msg': 'Could not validate webcode'});
@@ -97,11 +92,10 @@ app.get('/user/:id', function (req, res) {
 	User.findOne({ _id: req.params.id }, function (err, user) {
 		if (err) {
 			clog("Error retrieving user:", err);
-			res.json({status: 'error', msg: err });
-		} else {
-			clog("Retrieved user:", user);
-			res.json({ status: 'ok', user: user });
+			return res.json({status: 'error', msg: err });
 		}
+		clog("Retrieved user:", user);
+		res.json({ status: 'ok', user: user });
 	});
 });
 
@@ -121,7 +115,10 @@ var validateUsername = function (uname, success, failure) {
 					// Valid user, so cache in DB
 					var newUser = new User({ username: uname });
 					newUser.save(function (err, savedUser) {
-						if (err) clog("Error saving ", uname, "in DB:", err);
+						if (err) {
+							clog("Error saving ", uname, "in DB:", err);
+							failure();
+						}
 						else clog("Saved user in DB:", newUser);
 
 						success(savedUser);
@@ -209,12 +206,11 @@ app.post('/messages/create', function (req, res) {
 			msg.save(function (err, savedMsg) {
 				if (err) {
 					clog("Error inserting message into DB:", err);
-					res.json({ status: "error", msg: "Something went wrong" });
-				} else {
-					clog("Successfully inserted msg into DB:", savedMsg);
-					eventEmitter.emit("newMsg", savedMsg);
-					res.json({ status: "ok" });
+					return res.json({ status: "error", msg: "Something went wrong" });
 				}
+				clog("Successfully inserted msg into DB:", savedMsg);
+				eventEmitter.emit("newMsg", savedMsg);
+				res.json({ status: "ok" });
 			});
 		}, function () {
 			// validating users failed, send error response
@@ -225,13 +221,13 @@ app.post('/messages/create', function (req, res) {
 });
 
 app.get('/locations/all', function (req, res) {
-	Location.find( function (err, locs) {
-		if (err) clog("Error getting locations:", err);
+	Location.find().exec( function (err, locs) {
+		if (err) {
+			clog("Error getting locations:", err);
+			return res.json({ status: 'error', msg: err });
+		}
 		clog("Locations:", locs);
-		locs = _.map(locs, function (loc, idx) {
-			return loc.name; // front end only needs the names
-		})
-		res.json(locs);
+		res.json({status: 'ok', locs: locs });
 	});
 });
 
@@ -275,11 +271,12 @@ app.get('/messages/read/:skip?/:limit?', function (req, res) {
 		.limit(req.params.limit ? req.params.limit : "")
 		.populate('triggerLocs')
 		.exec(function (err, msgs) {
-			if (err) clog("Error while retrieving read messages:", err);
-			else {
-				// msgs = filterMessagesRead(msgs, req);
-				res.json({status: 'ok', messages: msgs, total: req.session.user.readMessages.length });
+			if (err) {
+				clog("Error while retrieving read messages:", err);
+				return res.json({ status: 'error', msg: err });
 			}
+			// msgs = filterMessagesRead(msgs, req);
+			res.json({status: 'ok', messages: msgs, total: req.session.user.readMessages.length });
 		});
 });
 
@@ -294,20 +291,21 @@ app.get('/messages/unread/:skip?/:limit?', function (req, res) {
 		.limit(req.params.limit ? req.params.limit : "")
 		.populate('triggerLocs')
 		.exec(function (err, msgs) {
-			if (err) clog("Error while retrieving read messages:", err);
-			else {
-				// msgs = filterMessagesUnread(msgs, req);
-				res.json({status: 'ok', 'messages': msgs });
+			if (err) {
+				clog("Error while retrieving unread messages:", err);
+				return res.json({ status: 'error', msg: err });
 			}
+			// msgs = filterMessagesUnread(msgs, req);
+			res.json({status: 'ok', 'messages': msgs });
 		});
 });
 
 app.post('/messages/read/:id', function (req, res) {
 	clog("Message being marked as read:", req.params.id, req.session.user.username, req.session.user.readMessages.length);
 	User.findOne({ username: req.session.user.username }, function (err, user) {
-		if (err) clog("Error retrieving logged in User from DB:", err);
+		if (err) return clog("Error retrieving logged in User from DB:", err);
 		Message.findOne({ _id: req.params.id }, function (err, msg) {
-			if (err) clog("Error finding message", msg);
+			if (err) return clog("Error finding message", msg);
 			user.readMessages.push({
 				message: msg,
 				readAt: new Date()
@@ -316,38 +314,99 @@ app.post('/messages/read/:id', function (req, res) {
 			user.save(function (err) {
 				if (err) {
 					clog("Error saving user:", err);
-					res.json({ status: 'error', msg: err });
-				} else {
-					req.session.user = user;
-					clog("Successfully updated read messages:", req.session.user.readMessages.length);
-					res.json({ status: 'ok' });
+					return res.json({ status: 'error', msg: err });
 				}
-				
+				req.session.user = user;
+				clog("Successfully updated read messages:", req.session.user.readMessages.length);
+				res.json({ status: 'ok' });
 			});
-			
 		});
-		
 	});
 });
 
-app.get('/screen/:screenid/groups', function (req, res) {
+app.get('/locations/:screenid/groups', function (req, res) {
 	var screenid = req.params.screenid.trim();
 	clog("Checking groups for screenid:", screenid);
-	var url = "http://tagnet.media.mit.edu/groups?screenid="+screenid;
-	request.get(url, function (err, response, body) {
-		if (err) clog("Got error checking groups:", err);
-		else if (response.statusCode != "200") clog("Bad response code:", response.statusCode);
-		else {
-			clog("Got response:", body);
-			
+	Location.findOne({ screenid: screenid }).populate('groups').exec(function (err, location) {
+		if (err) return clog("Error getting location:", err);
+
+		clog("Location found in DB:", location);
+		if (location.groups && location.groups.length != 0) {
+			// Have the groups cached in DB, return those
+			res.json({ status: 'ok', groups: location.groups });
+			// update the cache after sending the response
+			updateGroups(location);
+		} else {
+			// Need to look up the groups
+			updateGroups(location);
 		}
 	});
 
-	var url = "http://tagnet.media.mit.edu/get_project_info?projectid="+3489;
+var updateGroups = function (location) {
+	location.groups = [];
 
-	request.get(url, function(err, response, body) {
-		// clog(body);
+	var url = "http://tagnet.media.mit.edu/groups?screenid="+screenid;
+	clog("Checking tagnet for groups");
+	request.get(url, function (err, response, body) {
+		if (err)  return clog("Got error checking groups:", err);
+		else if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
+
+		// clog("Got response:", body);
+		body = JSON.parse(body);
+		var count = 0, target = body.groups.length;
+
+		var updateLoc = function (grp) {
+			location.groups.push(grp);
+			if (++count >= target) {
+				// Only save once all of the groups have been added
+				location.save(function (err) {
+					if (err) return clog("Error saving Location:", err);
+					clog("Successfully updated location to include group", location);
+				});
+			}
+		}
+
+		for (var i=0,group; group=body.groups[i]; i++) {
+			(function (group) {
+				clog("Group:", group.id, group.name);
+				Group.findOne({ groupid: group.id, name: group.name }, function (err, grp) {
+					if (err) return clog("Error trying to find group in DB:", err);
+					if (!grp) {
+						// Need to create group
+						clog("Group was null, so create it..");
+						grp = new Group({
+							groupid: group.id,
+							name: group.name
+						});
+						grp.save(function (err) {
+							clog(grp);
+							updateLoc(grp);
+						});
+					} else {
+						// Group saved, but need to add it to location
+						clog("Found group in DB:", grp);
+						updateLoc(grp);
+					}
+					
+				});
+			})(group); // Seal in value for group
+		}
 	});
+};
+	
+	
+
+	// http://tagnet.media.mit.edu/get_projects_by_group?groupid=2129
+
+	// var url = "http://tagnet.media.mit.edu/get_project_info?projectid="+3489;
+
+	// request.get(url, function(err, response, body) {
+	// 	if (err) clog("Got error checking project info:", err);
+	// 	else if (response.statusCode != "200") clog("Bad response code:", response.statusCode);
+	// 	else {
+	// 		clog("Got response from checking project info:", body);
+	// 	}
+	// });
 });
 
 app.get('/dummyloc', function (req, res) {
@@ -393,9 +452,10 @@ eventEmitter.on("newMsg", function (msg) {
 		(function (socket) {
 			clog("Event emitted for recently posted message:", msg, socket.id);
 			socket.get('username', function (err, uname) {
-				if (err) clog("Error getting username from socket:", err);
+				if (err) return clog("Error getting username from socket:", err);
 
 				Message.findOne(msg).populate('sender to triggerLocs').exec(function (err, theMsg) {
+					if (err) return clog("Error finding the message");
 					clog("The message that will be delivered to the client:", uname, theMsg);
 					clog(theMsg.to);
 					if (_.contains(_.pluck(theMsg.to, 'username'), uname)) {
@@ -425,94 +485,6 @@ io.sockets.on('connection', function (socket) {
 		clog("Socket disconnected:", socket.id);
 	});
 });
-
-var Schema = mongoose.Schema;
-
-var LocationSchema = new Schema({
-	name: { type: String, unique: true, required: true, trim: true }
-});
-
-var UserSchema = new Schema({
-	username: { type: String, unique: true, required: true, trim: true },
-	readMessages: [{
-		readAt: { type: Date, default: Date.now},
-		message: { type: Schema.Types.ObjectId, ref: Message, required: true }
-	}]
-});
-
-UserSchema.pre('save', function (next) {
-	var seen = {};
-
-	for (var i=0, elem; elem=this.readMessages[i]; i++) {
-		elem = elem.message;
-		if (elem in seen) {
-			var err = new Error('This message has aleady been marked read: ' + elem);
-			next(err);
-		} else {
-			seen[elem]=true;
-		}
-	}
-	next();
-});
-
-var MessageSchema = new Schema({
-	createdAt: {type: Date, default: Date.now},
-	subject: { type: String, required: true },
-	body: { type: String, required: true },
-	sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-	to: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
-	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
-});
-
-var Location = mongoose.model('Location', LocationSchema);
-var User = mongoose.model('User', UserSchema);
-var Message = mongoose.model('Message', MessageSchema);
-
-var addLocations = function () {
-	var locNames = [
-		"e14-474-1",
-		"e15-468-1A",
-		"e14-274-1",
-		"NONE"
-	];
-
-	for (var i=0, name; name=locNames[i]; i++) {
-		(function (name) {
-			var loc = new Location({ name: name });
-			loc.save(function (err, loc) {
-				if (err) clog("Error saving ", name, ":", err);
-				else clog("Saved location:", name);
-			});
-		})(name);
-	}
-};
-
-var addUsers = function () {
-	var users = [
-		"blazarus",
-		"havasi",
-		"jon"
-	];
-	for (var i=0, name; name=users[i]; i++) {
-		(function (name) {
-			var user = new User({ username: name });
-			user.save(function (err, user) {
-				if (err) clog("Error saving ", name, ":", err);
-				else clog("Saved user:", name);
-			});
-		})(name);
-	}
-};
-
-var testMessages = function () {
-
-	var blazarus = User.findOne({username: 'blazarus'}, function (err, users) {
-
-		clog("users:", users);
-	});
-};
-
-
 
 server.listen(8080);
 

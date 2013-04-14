@@ -74,6 +74,14 @@ window.App = {
 			}
 		});
 
+		App.locations = new App.Collections.Locations();
+
+		App.locations.fetch({
+			success: function () {
+
+			}
+		});
+
 		// Set up socket.io
 		App.socket = io.connect('http://localhost');
 

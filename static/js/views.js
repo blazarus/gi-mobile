@@ -10,7 +10,7 @@ App.Views.ReadMessages = Backbone.View.extend({
 
 	initialize: function () {
 		this.page = 0;
-		this.lastPage = Math.ceil(this.collection.total/this.options.resultsPerPage)-1;
+		this.lastPage = Math.floor(this.collection.total/this.options.resultsPerPage);
 
 		// Initial rendering
 		var tplt = this.template();
@@ -372,15 +372,25 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 	el: "#project-browser",
 
 	initialize: function () {
-		this.listenTo(this.model, 'change', this.render);
+		// this.model is the logged in User
+		this.listenTo(this.model, 'change:location', this.render);
 		this.render();
 	},
 
 	render: function () {
 		this.$el.html(this.model.get('location'));
-		var url = "screen/" + this.model.get('location') + "/groups";
+		var _this = this;
+		var url = "locations/" + this.model.get('location') + "/groups";
 		$.getJSON(url, function (resp) {
-			console.log("resp:", resp);
+			console.log("resp from getting groups:", resp);
+			for (var i=0, group; group=resp.groups[i]; i++) {
+				_this.$el.append($("<button>").addClass('btn').text(group.name));
+			}
 		});
 	}
 });
+
+
+
+
+
