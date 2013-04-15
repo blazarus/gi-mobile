@@ -14,12 +14,12 @@ App.Models.Message = Backbone.Model.extend({
 	},
 
 	parse: function (response) {
-		response.sender = App.allUsers.getOrCreate(response.sender);
-		response.to = _.map(response.to, function (elem) {
-			return App.allUsers.getOrCreate(elem);
+		response.sender = App.allUsers.getOrCreate({ _id: response.sender });
+		response.to = _.map(response.to, function (id) {
+			return App.allUsers.getOrCreate({ _id: id });
 		});
-		response.triggerLocs = _.map(response.triggerLocs, function (elem) {
-			return new App.Models.Location(elem);
+		response.triggerLocs = _.map(response.triggerLocs, function (id) {
+			return new App.Models.Location({ _id: id });
 		});
 		response.createdAt = new Date(response.createdAt);
 		return response;
@@ -68,9 +68,17 @@ App.Collections.ReadMessages = Backbone.Collection.extend({
 App.Models.User = Backbone.Model.extend({
 	defaults: {
 		username: "",
-		location: "",
-		tstamp: "",
-		validated: false
+		location: null,
+		tstamp: null
+	},
+
+	url: function () {
+		var params = {
+			_id: this.get('_id'),
+			username: this.get('username')
+		};
+		params = $.param(params);
+		return '/user?' + params;
 	},
 
 	initialize: function () {
@@ -79,40 +87,63 @@ App.Models.User = Backbone.Model.extend({
 			clearInterval(this.intervalId);
 		});
 
-		if (!this.get("validated")) {
-			this.checkUsername();
-		}
+		var loc = new App.Models.Location({screenid: "NONE"});
+		this.set('location', loc);
+		var _this = this;
+		this.on('change:location', function (e) {
+			var f = function () {
+				var loc = App.locations.get(_this.get('location'));
+
+			};
+			// Do if fetched already or wait until fetched
+			if (App.locations.fetched) {
+				f();
+			} else {
+				_this.listenToOnce(App.locations, 'fetched', f);
+			}
+		});
+
 		var _this = this;
 		_this.checkLocation(_this);
 		// Check location every 500 ms
 		this.intervalId = setInterval(function () {
-			_this.checkLocation(_this);
+			_this.checkLocation.call(_this);
 		}, 500);
 		console.log("intervalId:", this.intervalId);
 	},
 
-	checkUsername: function () {
+	parse: function (resp) {
+		if (resp.status == 'ok' && 'user' in resp) {
+			return resp.user;
+		} else {
+			console.log("Something went wrong!");
+		}
+	},
+
+	checkUsername: function (success, failure) {
 		// Validate that this is a legit media lab user
 		var _this = this;
 		$.getJSON('/checkuser', {username: this.get("username")}, function (resp) {
 			console.log("Response from checking username:", resp);
 			if (resp.status === "ok") {
-
+				success();
 			} else {
-				_this.destroy();
+				// _this.destroy();
 				console.log("This is not a valid username:", this.get('username'));
-				alert("This is not a valid username.");
+				// alert("This is not a valid username.");
+				failure();
 			}
 		});
 	},
 
-	checkLocation: function (_this) {
-
+	checkLocation: function () {
+		var _this = this;
 		if (!App.options.DUMMY_LOC) {
 			$.getJSON('http://gi-ego.media.mit.edu/' + _this.get("username") + '/events/1', function (resp) {
 
 				if (resp && resp.events.length > 0 && resp.events[0].readerid && resp.events[0].tstamp) {
-					var loc = resp.events[0].readerid;
+					var screenid = resp.events[0].readerid;
+					var loc = App.locations.getOrCreate({ screenid: screenid });
 					var tstmp = resp.events[0].tstamp;
 					tstmp = new Date(tstmp);
 					// Only update the model if there is a change
@@ -125,7 +156,7 @@ App.Models.User = Backbone.Model.extend({
 
 					}
 				} else if (resp && resp.events.length === 0) {
-					var loc = "Has not been seen";
+					var loc = null;
 					var tstmp = null;
 					// Only update the model if there is a change
 					if (_this.get('location') != loc || _this.get('tstamp') != tstmp) {
@@ -142,13 +173,16 @@ App.Models.User = Backbone.Model.extend({
 		} else {
 			$.getJSON('/dummyloc/getloc', function (resp) {
 				// console.log("response from /lastloc (w/ dummy locaction):", resp);
-				if (resp.status == "ok" && resp.loc && _this.get('location') != resp.loc) {
-					console.log("Updating location", resp.loc);
-					_this.set({
-						location: resp.loc,
-						tstamp: new Date()
-					});
-				}
+				if (resp.status == "ok" && resp.loc) {
+					var loc = App.locations.getOrCreate(resp.loc);
+					if (_this.get('location') != loc) {
+						console.log("Updating location for", _this.get('username'), loc);
+						_this.set({
+							location: loc,
+							tstamp: new Date()
+						});
+					}
+				} 
 			});
 		}
 	},
@@ -172,40 +206,66 @@ App.Models.User = Backbone.Model.extend({
 
 });
 
-App.Collections.Users = Backbone.Collection.extend({
+App.Collections.Pool = Backbone.Collection.extend({
+	model: Backbone.Model,
+
+	findKey: "_id",
+
+	getOrCreate: function (attrs, options) {
+		/*
+		 * Factory method for creating users
+		 * options:
+		 * 		forceFetch -> fetch/populate model even if already in Pool
+		 * 		suppressFetch -> don't fetch/populate even if not in Pool
+		 * 		findKey -> override default. key for which to search for the Model
+		 */
+
+		options = options || {};
+		
+		var key = options.findKey || this.findKey;
+		
+		var doFetch = function () {
+			model.fetch({
+				success: function (model, response, options) {
+					console.log("Successfully fetched model:", model);
+				}, 
+				error: function (model, response, options) {
+					console.log("Error fetching model:", response.responseText, model);
+					model.destroy();
+				}
+			});
+		};
+
+		var findFilter = {};
+		if (key in attrs) {
+			findFilter[key] = attrs[key];
+		} else if ('_id' in attrs) {
+			findFilter['_id'] = attrs['_id'];
+		}
+		var existingModel = this.findWhere(findFilter);
+		if (existingModel) {
+			if (options.forceFetch) doFetch();
+			return existingModel;
+		}
+		var model = new this.model(attrs);
+		this.add(model);
+		if (!options.suppressFetch) {
+			doFetch();
+		}
+		return model;		
+	}
+});
+
+App.Collections.Users = App.Collections.Pool.extend({
 	// Keep track of all the users we know of on the front end
 	model: App.Models.User,
 
-	getOrCreate: function (attrs) {
-		// Factory method for creating users
-		if (attrs instanceof Object) {
-			var existingUser = this.findWhere({ username: attrs.username });
-			if (existingUser) {
-				return existingUser;
-			}
-			var user = new App.Models.User(attrs);
-			this.add(user);
-			return user;
-		} else {
-			// attrs is just a string of the user id
-			var existingUser = this.findWhere({ _id: attrs });
-			if (existingUser) {
-				return existingUser;
-			}
-			var user = new App.Models.User({ _id: attrs, validated: true });
-			// Don't check username right now cuz we haven't populated it yet
-			this.add(user);
-			// populate the user asynchronously
-			$.getJSON('/user/'+attrs, function (resp) {
-				console.log("Response from getting user:", resp);
-				if (resp.status == 'ok') {
-					user.set(resp.user);
-				}
-			});
-			return user
-		}
-		
+	findKey: 'username',
+
+	initialize: function () {
+
 	}
+
 });
 
 App.Collections.FollowingList = Backbone.Collection.extend({
@@ -219,13 +279,33 @@ App.Collections.FollowingList = Backbone.Collection.extend({
 
 
 App.Models.Location = Backbone.Model.extend({
+	url: function () {
+		return '/locations/' + this.get('screenid');
+	},
+
+	initialize: function () {
+
+	},
+
 	toString: function () {
 		return this.get("screenid");
+	},
+	parse: function (response) {
+		if ('loc' in response) response = response.loc;
+		for (var i=0, group; group=response.groups[i]; i++) {
+			response.groups[i] = new App.Models.Group(group);
+		}
+
+		return response
 	}
 });
 
-App.Collections.Locations = Backbone.Collection.extend({
+App.Collections.Locations = App.Collections.Pool.extend({
 	url: '/locations/all',
+
+	model: App.Models.Location,
+
+	findKey: 'screenid',
 
 	initialize: function () {
 
@@ -233,6 +313,35 @@ App.Collections.Locations = Backbone.Collection.extend({
 
 	parse: function (response) {
 		return response.locs;
+	}
+
+
+});
+
+App.Models.Group = Backbone.Model.extend({
+	url: function () {
+		return 'groups/' + this.get('groupid');
+	},
+
+	initialize: function () {
+
+	},
+
+	parse: function (response) {
+		if ('group' in response) response = response.group;
+		for (var i=0, project; project=response.projects[i]; i++) {
+			response.projects[i] = new App.Models.Project(project);
+		}
+		return response;
+	}
+});
+
+App.Models.Project = Backbone.Model.extend({
+	url: function () {
+		return 'projects/' + this.get('pid');
+	},
+	parse: function (response) {
+		if ('project' in response) return response.project;
 	}
 });
 

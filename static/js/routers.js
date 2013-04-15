@@ -81,8 +81,7 @@ App.Routers.main = Backbone.Router.extend({
 
 					console.log("Response from checklogin:", resp);
 					if (resp.status == "ok" && resp.user) {
-						window.App.User = App.allUsers.getOrCreate(resp.user);
-						App.User.set("validated", true); // No need to do another check of the username
+						window.App.User = App.allUsers.getOrCreate(resp.user, { fetch: false });
 						console.log("User logged in, continue. The user:", App.User);
 
 						App.EventDispatcher.trigger('login_success');
@@ -107,13 +106,11 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	browseProjects: function () {
-		// $()
-		// var screenid = App.User.get('location');
-		// javascript:debugger;
-		// console.log("HAHAHAHAHAH", App.User.get("location"));
-		// console.log("HAHAHAHAHAH", App.User);
 		$(".main-content").html($("<div>").attr("id", "project-browser"));
-		App.projectBrowserView = new App.Views.ProjectBrowser({ model: App.User });
+		App.projectBrowserView = new App.Views.ProjectBrowser({ 
+			user: App.User,
+			locations: App.locations
+		});
 
 		$("nav li").removeClass("active");
 		$("nav li#projectBrowser").addClass("active");
@@ -158,13 +155,16 @@ App.Routers.main = Backbone.Router.extend({
 		});
 
 		App.readMsgs.fetch({
-			success: function () {
+			success: function (collection, response, options) {
 				console.log("Read messages:", App.readMsgs);
 				App.readMsgsView = new App.Views.ReadMessages({
 					collection: App.readMsgs,
 					resultsPerPage: resultsPerPage
 				})
 				.render();
+			},
+			error: function (collection, response, options) {
+				console.log("Error in fetch:", collection, response);
 			}
 		});
 	},
@@ -203,7 +203,7 @@ App.Routers.main = Backbone.Router.extend({
 	// },
 
 	showLogin: function() {
-		console.log("navigating to login", window.App.Templates.login);
+		console.log("navigating to login");
 		var tmpl = _.template(window.App.Templates.login)();
 		$(".main-content").html(tmpl);
 		App.loginView = new App.Views.LoginView();

@@ -8,23 +8,24 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
-	Location.find(function (err, locs) {
-		for (var i=0,loc; loc=locs[i]; i++) {
-			loc.remove();
-		}
-		Location.find(function (err, lcs) {
-			clog("hello", lcs);
-			addLocations();
-		});
-	});
-	Group.find(function (err, groups) {
-		for (var i=0,group; group=groups[i]; i++) {
-			group.remove();
-		}
-		Group.find(function (err, gps) {
-			clog("hello", gps);
-		});
-	});
+	addLocations();
+	// Location.find(function (err, locs) {
+	// 	for (var i=0,loc; loc=locs[i]; i++) {
+	// 		loc.remove();
+	// 	}
+	// 	Location.find(function (err, lcs) {
+	// 		clog("hello", lcs);
+	// 		addLocations();
+	// 	});
+	// });
+	// Group.find(function (err, groups) {
+	// 	for (var i=0,group; group=groups[i]; i++) {
+	// 		group.remove();
+	// 	}
+	// 	Group.find(function (err, gps) {
+	// 		clog("hello", gps);
+	// 	});
+	// });
 	// User.findOne({username: 'blazarus'}, function (err, user) {
 	// 	user.readMessages = [];
 	// 	user.save(function (err) {
@@ -48,7 +49,8 @@ var GroupSchema = new Schema({
 
 var ProjectSchema = new Schema({
 	pid: { type: Number, required: true, unique: true },
-	name: { type: String, required: true, trim: true }
+	name: { type: String, required: true, trim: true },
+	description: { type: String, trim: true }
 });
 
 var UserSchema = new Schema({
@@ -57,6 +59,15 @@ var UserSchema = new Schema({
 		readAt: { type: Date, default: Date.now},
 		message: { type: Schema.Types.ObjectId, ref: 'Message', required: true }
 	}]
+});
+
+var MessageSchema = new Schema({
+	createdAt: {type: Date, default: Date.now},
+	subject: { type: String, required: true, trim: true },
+	body: { type: String, required: true, trim: true },
+	sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+	to: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
+	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
 });
 
 UserSchema.pre('save', function (next) {
@@ -89,21 +100,13 @@ LocationSchema.pre('save', function (next) {
 	next();
 });
 
-var MessageSchema = new Schema({
-	createdAt: {type: Date, default: Date.now},
-	subject: { type: String, required: true, trim: true },
-	body: { type: String, required: true, trim: true },
-	sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-	to: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
-	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
-});
-
 var addLocations = function () {
 	var locids = [
 		"e14-474-1",
 		"e15-468-1A",
 		"e14-274-1",
 		"e15-468-1",
+		"e14-514-1",
 		"charm-6",
 		"NONE"
 	];

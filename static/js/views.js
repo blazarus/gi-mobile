@@ -36,8 +36,11 @@ App.Views.ReadMessages = Backbone.View.extend({
 				// pass silent and manually call render, so only done once
 				// instead of for each model added
 				silent: true,
-				success: function () {
+				success: function (collection, response, options) {
 					_this.render();
+				},
+				error: function (collection, response, options) {
+					console.log("Error in fetch:", collection, response);
 				}
 			});
 		}
@@ -51,8 +54,11 @@ App.Views.ReadMessages = Backbone.View.extend({
 			var _this = this;
 			this.collection.fetch({
 				silent: true,
-				success: function () {
+				success: function (collection, response, options) {
 					_this.render();
+				},
+				error: function (collection, response, options) {
+					console.log("Error in fetch:", collection, response);
 				}
 			});
 		}
@@ -188,16 +194,19 @@ App.Views.PostMessageView = Backbone.View.extend({
 	el: '#compose-message',
 
 	initialize: function () {
-		console.log("Initializing PostMessageView");
+		console.log("Initializing PostMessageView. collection:", this.collection);
 
-		$.getJSON('/locations/all', function (resp) {
-			console.log("Response from all locations:", resp);
-			var container = $(document.createDocumentFragment()); 
-			for (var i=0, loc; loc=resp[i]; i++) {
-				container.append($("<option>").attr("value", loc).text(loc));
-			}
-			$("#compose-message #loc").append(container);
-		});
+		// Render once collection has been fetched
+		this.listenToOnce(this.collection, 'fetched', this.render);
+		if (this.collection.fetched) this.render();
+		// $.getJSON('/locations/all', function (resp) {
+		// 	console.log("Response from all locations:", resp);
+		// 	var container = $(document.createDocumentFragment()); 
+		// 	for (var i=0, loc; loc=resp[i]; i++) {
+		// 		container.append($("<option>").attr("value", loc).text(loc));
+		// 	}
+		// 	$("#compose-message #loc").append(container);
+		// });
 	},
 
 	events: {
@@ -219,6 +228,14 @@ App.Views.PostMessageView = Backbone.View.extend({
 	clearForm: function () {
 		this.$("input:text, textarea").val("");
 		this.$("input#send-to").focus();
+	},
+
+	render: function () {
+		var container = $(document.createDocumentFragment()); 
+		for (var i=0, loc; loc=this.collection.models[i]; i++) {
+			container.append($("<option>").attr("value", loc.get('screenid')).text(loc.get('screenid')));
+		}
+		$("#compose-message #loc").append(container);
 	}
 });
 
@@ -240,7 +257,6 @@ App.Views.LoginView = Backbone.View.extend({
 
 			if (resp.status == "ok" && resp.user) {
 				window.App.User = App.allUsers.getOrCreate(resp.user);
-				App.User.set("validated", true); // No need to do another check of the username
 				App.EventDispatcher.trigger('login_success');
 				App.router.navigate("", { trigger: true });
 			} else {
@@ -256,15 +272,16 @@ App.Views.UserView = Backbone.View.extend({
 	initialize: function () {
 		console.log("Initializing userView");
 
-		this.listenTo(this.model, 'change', this.render);
+		this.listenTo(this.model, 'change:location', this.render);
 		this.render();
 	},
 
 	render: function () {
 		this.$el.css('visibility', 'visible');
 		this.$("#username").text(this.model.get('username'));
-		var loc = this.model.get('location') || "Searching..."
-		this.$("#currloc").text(loc);
+		var loc = this.model.get('location');
+		var locText = loc ? loc.get('screenid') : "Searching...";
+		this.$("#currloc").text(locText);
 
 		return this;
 	}
@@ -371,26 +388,165 @@ App.Views.LocateUserView = Backbone.View.extend({
 App.Views.ProjectBrowser = Backbone.View.extend({
 	el: "#project-browser",
 
-	initialize: function () {
-		// this.model is the logged in User
-		this.listenTo(this.model, 'change:location', this.render);
+	states: {
+		NOLOC: "noloc", // No location yet, show all groups
+		LOC: "location",
+		GROUP: "group",
+		PROJ: "project"
+	},
+
+	state: null,
+
+	subViews: [],
+
+	initialize: function (options) {
+		this.user = options.user;
+		this.locations = options.locations;
+		this.state = this.states.LOC;
+		this.node = this.user.get('location');
+		this.listenTo(this.user, 'change:location', this.updateLoc);
+		this.render();
+
+	},
+
+	updateLoc: function () {
+		this.node = this.user.get('location');
+		if (this.node.get('screenid') == "NONE") {
+			this.state = this.states.NOLOC;
+		} else {
+			this.state = this.states.LOC;
+		}
+		this.render();
+	},
+
+	showGroup: function (group) {
+		this.node = group;
+		this.state = this.states.GROUP;
+		this.render();
+	},
+
+	showProject: function (project) {
+		this.node = project;
+		this.state = this.states.PROJ;
 		this.render();
 	},
 
 	render: function () {
-		this.$el.html(this.model.get('location'));
+		console.log("Rendering project browser. state:", this.state);
+		this.$el.empty();
+		for (var i=0,subview; subview=this.subViews[i]; i++) {
+			subview.remove();
+		}
+		this.subViews = [];
+
+		this.$el.html(this.user.get('location').get('screenid'));
+
+		switch (this.state) {
+			case this.states.NOLOC:
+				this.renderLoc();
+				break;
+			case this.states.LOC:
+				this.renderLoc();
+				break;
+			case this.states.GROUP:
+				this.renderGroup();
+				break;
+			case this.states.PROJ:
+				this.renderProject();
+				break;
+		}
+		
+
+		return this;
+	},
+
+	renderLoc: function () {
 		var _this = this;
-		var url = "locations/" + this.model.get('location') + "/groups";
-		$.getJSON(url, function (resp) {
-			console.log("resp from getting groups:", resp);
-			for (var i=0, group; group=resp.groups[i]; i++) {
-				_this.$el.append($("<button>").addClass('btn').text(group.name));
+		this.node.fetch({
+			success: function (model, response, options) {
+				console.log("Populated groups:", model);
+				var container = $(document.createDocumentFragment()); 
+				var numGroups = model.get('groups').length;
+				for (var i=0; i < numGroups; i++) {
+					var group = model.get('groups')[i];
+					(function (group) {
+						console.log("group", i, group);
+						var button = new App.Views.ProjectBrowser.Button({ model: group });
+						_this.subViews.push(button);
+						_this.listenTo(button, 'click', function (e) {
+							console.log("clicked group", i, group);
+							this.showGroup(group);
+						});
+						container.append(button.render().$el);
+					})(group);
+					
+				}
+				_this.$el.append(container);
+			}
+		});
+	},
+
+	renderGroup: function () {
+		var _this = this;
+		this.node.fetch({
+			success: function (model, response, options) {
+				console.log("Populated projects for group:", model);
+				var container = $(document.createDocumentFragment()); 
+				var numProjects = model.get('projects').length;
+				for (var i=0; i < numProjects; i++) {
+					var project = model.get('projects')[i];
+					(function (project) {
+						var button = new App.Views.ProjectBrowser.Button({ model: project });
+						_this.subViews.push(button);
+						_this.listenTo(button, 'click', function (e) {
+							console.log(button);
+							this.showProject(project);
+						});
+						container.append(button.render().$el);
+					})(project);
+					
+				}
+				_this.$el.append(container);
+			}
+		});
+	},
+
+	renderProject: function () {
+		var _this = this;
+		this.node.fetch({
+			success: function (model, response, options) {
+				console.log("Populated project:", model);
+				var container = $(document.createDocumentFragment()); 
+				container.append($("<div>").text(model.get('name')));
+				container.append($("<div>").html(model.get('description'))); // use .html() to decode special characters
+				_this.$el.append(container);
 			}
 		});
 	}
 });
 
+App.Views.ProjectBrowser.Button = Backbone.View.extend({
+	tagName: "button",
 
+	className: "btn",
+
+	events: {
+		"click": "click"
+	},
+
+	initialize: function () {
+		// this.model is a Group
+	},
+
+	click: function (e) {
+		this.trigger('click');
+	},
+
+	render: function () {
+		this.$el.text(this.model.get('name'));
+		return this;
+	}
+});
 
 
 

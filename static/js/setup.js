@@ -2,6 +2,8 @@
  * Set up the globally accessible App object
  */
 
+ // javascript:debugger;
+
 window.App = {
 	EventDispatcher: {},
 	Models: {},
@@ -67,18 +69,27 @@ window.App = {
 		// App.newMsgView = new App.Views.NewMsg({ collection: App.unreadMsgs });
 
 		App.unreadMsgs.fetch({
-			success: function () {
+			success: function (collection, response, options) {
 				console.log("Unread messages:", App.unreadMsgs);
 				App.EventDispatcher.trigger('newMsgsLoaded');
 				App.unreadMsgs.loaded = true;
+			},
+			error: function (collection, response, options) {
+				console.log("Error in fetch:", collection, response);
 			}
 		});
 
 		App.locations = new App.Collections.Locations();
 
 		App.locations.fetch({
-			success: function () {
+			success: function (collection, response, options) {
+				console.log("Fetched locations:", collection, response);
 
+				App.locations.fetched = true;
+				App.locations.trigger('fetched');
+			},
+			error: function (collection, response, options) {
+				console.log("Error in fetch:", collection, response);
 			}
 		});
 
