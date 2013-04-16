@@ -29,7 +29,7 @@ app.use(express.bodyParser());
 app.use(express.cookieParser('\n\x0c\x86~E\\\xfe\xe1\xc5m\xd1#\x90\xfaQD\x1d\xc6]=\xf5\rd\xa1'));
 app.use(express.session());
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
-app.use(express.static(path.join(__dirname, 'static')));
+app.use(express.static(path.join(__dirname, '')));
 
 app.post('/login', function (req, res) {
 	clog("The request form:", req.body);
