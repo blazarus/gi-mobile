@@ -108,9 +108,11 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	browseProjects: function () {
-		var rtr = App.projectBrowserRouter = new App.Routers.ProjectBrowser();
-		Backbone.history.stop();
-		Backbone.history.start({pushState: true});
+		if (!App.projectBrowserRouter) {
+			App.projectBrowserRouter = new App.Routers.ProjectBrowser();
+			Backbone.history.stop();
+			Backbone.history.start();
+		}
 
 		$("nav li").removeClass("active");
 		$("nav li#projectBrowser").addClass("active");
@@ -222,7 +224,9 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 	routes: {
 		"project-browser": "showDefault",
 		"project-browser/location/:screenid": "showLocation",
-		"project-browser/:screenid": "showLocation"
+		"project-browser/:screenid": "showLocation",
+		"project-browser/group/:groupid": "showGroup",
+		"project-browser/project/:pid": "showProject"
 	},
 
 	initialize: function () {
@@ -234,12 +238,39 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 	},
 
 	showDefault: function () {
-		$(".main-content").html(App.projectBrowserView.render().$el);
-		
+		var screenid = App.User.get('location').get('screenid');
+		this.showLocation(screenid);
+		this.navigate('/project-browser/'+screenid);
 	},
 
 	showLocation: function (screenid) {
-		$(".main-content").html(App.projectBrowserView.render().$el);
+		var location = new App.Models.Location({ screenid: screenid });
+		location.fetch({
+			success: function (model, response, options) {
+				$(".main-content").html(App.projectBrowserView.$el);
+				App.projectBrowserView.showLoc(model);
+			}
+		});
+	},
+
+	showGroup: function (groupid) {
+		var group = new App.Models.Group({ groupid: groupid });
+		group.fetch({
+			success: function (model, response, options) {
+				$(".main-content").html(App.projectBrowserView.$el);
+				App.projectBrowserView.showGroup(model);
+			}
+		});
+	},
+
+	showProject: function (pid) {
+		var project = new App.Models.Project({ pid: pid });
+		project.fetch({
+			success: function (model, response, options) {
+				$(".main-content").html(App.projectBrowserView.$el);
+				App.projectBrowserView.showProject(model);
+			}
+		});
 	}
 
 })

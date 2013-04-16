@@ -387,7 +387,7 @@ App.Views.LocateUserView = Backbone.View.extend({
 
 App.Views.ProjectBrowser = Backbone.View.extend({
 	tagName: "div",
-	id: "#project-browser",
+	id: "project-browser",
 
 	states: {
 		NOLOC: "noloc", // No location yet, show all groups
@@ -406,7 +406,7 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		this.locations = options.locations;
 		this.state = this.states.LOC;
 		this.node = this.user.get('location');
-		this.listenTo(this.user, 'change:location', this.updateLoc);
+		// this.listenTo(this.user, 'change:location', this.updateLoc);
 	},
 
 	updateLoc: function () {
@@ -420,18 +420,22 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		this.render();
 	},
 
+	showLoc: function (location) {
+		this.node = location;
+		this.state = this.states.LOC;
+		return this.render();
+	},
+
 	showGroup: function (group) {
-		this.router.navigate('/project-browser/group/'+group.get('groupid'));
 		this.node = group;
 		this.state = this.states.GROUP;
-		this.render();
+		return this.render();
 	},
 
 	showProject: function (project) {
-		this.router.navigate('/project-browser/project/'+project.get('pid'));
 		this.node = project;
 		this.state = this.states.PROJ;
-		this.render();
+		return this.render();
 	},
 
 	render: function () {
@@ -465,66 +469,52 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 
 	renderLoc: function () {
 		var _this = this;
-		this.node.fetch({
-			success: function (model, response, options) {
-				console.log("Populated groups:", model);
-				var container = $(document.createDocumentFragment()); 
-				var numGroups = model.get('groups').length;
-				for (var i=0; i < numGroups; i++) {
-					var group = model.get('groups')[i];
-					(function (group) {
-						console.log("group", i, group);
-						var button = new App.Views.ProjectBrowser.Button({ model: group });
-						_this.subViews.push(button);
-						_this.listenTo(button, 'click', function (e) {
-							console.log("clicked group", i, group);
-							this.showGroup(group);
-						});
-						container.append(button.render().$el);
-					})(group);
-					
-				}
-				_this.$el.append(container);
-			}
-		});
+		var container = $(document.createDocumentFragment()); 
+		var numGroups = this.node.get('groups').length;
+		for (var i=0; i < numGroups; i++) {
+			var group = this.node.get('groups')[i];
+			(function (group) {
+				console.log("group", i, group);
+				var button = new App.Views.ProjectBrowser.Button({ model: group });
+				_this.subViews.push(button);
+				_this.listenTo(button, 'click', function (e) {
+					console.log("clicked group", i, group);
+					this.router.navigate('/project-browser/group/' + group.get('groupid'), {trigger: true});
+				});
+				container.append(button.render().$el);
+			})(group);
+			
+		}
+		_this.$el.append(container);
 	},
 
 	renderGroup: function () {
 		var _this = this;
-		this.node.fetch({
-			success: function (model, response, options) {
-				console.log("Populated projects for group:", model);
-				var container = $(document.createDocumentFragment()); 
-				var numProjects = model.get('projects').length;
-				for (var i=0; i < numProjects; i++) {
-					var project = model.get('projects')[i];
-					(function (project) {
-						var button = new App.Views.ProjectBrowser.Button({ model: project });
-						_this.subViews.push(button);
-						_this.listenTo(button, 'click', function (e) {
-							console.log(button);
-							this.showProject(project);
-						});
-						container.append(button.render().$el);
-					})(project);
-					
-				}
-				_this.$el.append(container);
-			}
-		});
+		var container = $(document.createDocumentFragment()); 
+		var numProjects = this.node.get('projects').length;
+		for (var i=0; i < numProjects; i++) {
+			var project = this.node.get('projects')[i];
+			(function (project) {
+				var button = new App.Views.ProjectBrowser.Button({ model: project });
+				_this.subViews.push(button);
+				_this.listenTo(button, 'click', function (e) {
+					console.log(button);
+					this.router.navigate('/project-browser/project/' + project.get('pid'), {trigger: true});
+				});
+				container.append(button.render().$el);
+			})(project);
+			
+		}
+		_this.$el.append(container);
 	},
 
 	renderProject: function () {
 		var _this = this;
-		this.node.fetch({
-			success: function (model, response, options) {
-				console.log("Populated project:", model);
-				var container = $(document.createDocumentFragment()); 
-				container.append($("<div>").text(model.get('name')));
-				container.append($("<div>").html(model.get('description'))); // use .html() to decode special characters
-				_this.$el.append(container);
-			}
-		});
+		var container = $(document.createDocumentFragment()); 
+		container.append($("<div>").text(this.node.get('name')));
+		container.append($("<div>").html(this.node.get('description'))); // use .html() to decode special characters
+		_this.$el.append(container);
+
 	}
 });
 

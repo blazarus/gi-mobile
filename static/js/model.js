@@ -320,7 +320,7 @@ App.Collections.Locations = App.Collections.Pool.extend({
 
 App.Models.Group = Backbone.Model.extend({
 	url: function () {
-		return 'groups/' + this.get('groupid');
+		return '/groups/' + this.get('groupid');
 	},
 
 	initialize: function () {
@@ -338,7 +338,7 @@ App.Models.Group = Backbone.Model.extend({
 
 App.Models.Project = Backbone.Model.extend({
 	url: function () {
-		return 'projects/' + this.get('pid');
+		return '/projects/' + this.get('pid');
 	},
 	parse: function (response) {
 		if ('project' in response) return response.project;
