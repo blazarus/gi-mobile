@@ -235,6 +235,13 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 			locations: App.locations,
 			router: this
 		});
+
+		this.on('route', this.updateNav);
+	},
+
+	updateNav: function (e) {
+		$("nav li").removeClass("active");
+		$("nav li#projectBrowser").addClass("active");
 	},
 
 	showDefault: function () {
