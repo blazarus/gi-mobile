@@ -1,7 +1,9 @@
 // javascript:debugger
 
+document.addEventListener("deviceready", function () {
+	alert("OK");
+	navigator.notification.vibrate(2500); 
 $( function () {
-
 	checkParams();
 
 	// Make sure templates are loaded before running main logic
@@ -9,6 +11,7 @@ $( function () {
 	// blockUntilTrue(checkTemplates, window.App.init, 10);
 	window.App.init();
 });
+}, false);
 
 var checkParams = function () {
 	var params = location.href.split("?");
