@@ -1,4 +1,5 @@
-var mongoose = require('mongoose');
+var mongoose = require('mongoose'),
+	request  = require('request');
 mongoose.connect('mongodb://localhost/gi_companion');
 
 // alias console.log
@@ -8,7 +9,7 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
-	addLocations();
+	getAllLocs();
 	// Location.find(function (err, locs) {
 	// 	for (var i=0,loc; loc=locs[i]; i++) {
 	// 		loc.remove();
@@ -120,27 +121,69 @@ LocationSchema.pre('save', function (next) {
 	next();
 });
 
-var addLocations = function () {
-	var locids = [
-		"e14-474-1",
-		"e15-468-1A",
-		"e14-274-1",
-		"e15-468-1",
-		"e14-514-1",
-		"charm-6",
-		"NONE"
-	];
+// var addLocations = function () {
+// 	var locids = [
+// 		"e14-474-1",
+// 		"e15-468-1A",
+// 		"e14-274-1",
+// 		"e15-468-1",
+// 		"e14-514-1",
+// 		"charm-6",
+// 		"NONE"
+// 	];
 
-	for (var i=0, id; id=locids[i]; i++) {
-		(function (id) {
-			clog("saving loc with id:", id);
-			var loc = new Location({ screenid: id });
-			loc.save(function (err, loc) {
-				if (err) clog("Error saving ", id, ":", err);
-				else clog("Saved location:", id);
-			});
-		})(id);
-	}
+// 	for (var i=0, id; id=locids[i]; i++) {
+// 		(function (id) {
+// 			clog("saving loc with id:", id);
+// 			var loc = new Location({ screenid: id });
+// 			loc.save(function (err, loc) {
+// 				if (err) clog("Error saving ", id, ":", err);
+// 				else clog("Saved location:", id);
+// 			});
+// 		})(id);
+// 	}
+// };
+
+var getAllLocs = function () {
+	url = "http://tagnet.media.mit.edu/rfid/api/rfid_info";
+	request.get(url, function (err, response, body) {
+		if (err)  return clog("Got error checking locations:", err);
+		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
+
+		body = JSON.parse(body);
+		if (body.pollers.length == 0 && body.error) return clog("Got error from tagnet:", body.error);
+
+		for (var i=0,loc; loc=body.pollers[i]; i++) {
+			if (loc.name.match(/^e14|e15|charm|considerate/)) {
+				(function (loc) {
+					clog("Location:", loc.name);
+					Location.findOne({ screenid: loc.name }, function (err, location) {
+						if (err) return clog("Error trying to find location in DB:", err);
+						if (!location) {
+							// Need to create location
+							clog("Location was null, so add it..");
+							location = new Location({ screenid: loc.name });
+							location.save(function (err) {
+								if (err) return clog("Error trying to save loc in DB:", err);
+								clog("Added new location to DB:", location);
+							});
+						} else {
+							// Project saved, but need to add it to location
+							clog("Location already in DB:", location);
+						}
+						
+					});
+				})(loc); // Seal in value for loc
+			}
+		}
+	});
+
+	// Add a special NONE location
+	location = new Location({ screenid: "NONE" });
+	location.save(function (err) {
+		if (err) return clog("Error trying to save loc in DB:", err);
+		clog("Added new location to DB:", location);
+	});
 };
 
 var Location = mongoose.model('Location', LocationSchema);

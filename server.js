@@ -1,14 +1,14 @@
-var express = require('express'),
-	_ = require('underscore'),
-	request = require('request'),
-	path = require('path'),
-	fs = require('fs'),
+var express      = require('express'),
+	_            = require('underscore'),
+	request      = require('request'),
+	path         = require('path'),
+	fs           = require('fs'),
 	EventEmitter = require('events').EventEmitter,
-	app = express(),
-	http = require('http'),
-	server = http.createServer(app),
-	models = require('./models'),
-	io = require('socket.io').listen(server);
+	app          = express(),
+	http         = require('http'),
+	server       = http.createServer(app),
+	models       = require('./models'),
+	io           = require('socket.io').listen(server);
 
 // var mongoose = require('mongoose');
 // mongoose.connect('mongodb://localhost/gi_companion');

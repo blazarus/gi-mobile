@@ -5,6 +5,7 @@
  // javascript:debugger;
 
 window.App = {
+	serverURL: "http://0.0.0.0:8080",
 	EventDispatcher: {},
 	Models: {},
 	Collections: {},
