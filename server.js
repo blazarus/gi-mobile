@@ -337,7 +337,7 @@ app.get('/locations/:screenid', function (req, res) {
 			// Have the groups cached in DB, return those
 			success();
 			// update the cache after sending the response
-			updateGroupsForLoc(location, success);
+			updateGroupsForLoc(location, function () {});
 		} else {
 			// Need to look up the groups
 			updateGroupsForLoc(location, success);
@@ -475,7 +475,7 @@ app.get('/groups/:groupid', function (req, res) {
 			// Have the projects cached in DB, return those
 			success();
 			// update the cache after sending the response
-			updateProjectsForGroup(group, success);
+			updateProjectsForGroup(group, function () {});
 		} else {
 			// Need to look up the projects
 			updateProjectsForGroup(group, success);
@@ -558,7 +558,7 @@ app.get('/projects/:pid', function (req, res) {
 			// Have the projects cached in DB, return those
 			success();
 			// update the cache after sending the response
-			updateProjectInfo(project, success);
+			updateProjectInfo(project, function () {});
 		} else {
 			// Need to look up the projects
 			updateProjectInfo(project, success);
@@ -609,7 +609,7 @@ app.get('/user/:username/charms', function (req, res) {
 			// Have the projects cached in DB, return those
 			success();
 			// update the cache after sending the response
-			updateCharmsForUser(user, success);
+			updateCharmsForUser(user, function () {});
 		} else {
 			// Need to look up the projects
 			updateCharmsForUser(user, success);
