@@ -42,7 +42,7 @@ window.App = {
 		for (tmpl in window.App.Templates) {
 			(function (tmpl) {
 				// Expects templates to be accessible from /templates/<tmpl>
-				$.get('/templates/' + tmpl + '.html', function (data) {
+				$.get(App.serverURL+'/templates/' + tmpl + '.html', function (data) {
 					window.App.Templates[tmpl] = data;
 					if (++count >= target) {
 						// All templates have been loaded, fire event
@@ -97,7 +97,7 @@ window.App = {
 		});
 
 		// Set up socket.io
-		App.socket = io.connect('http://localhost');
+		App.socket = io.connect(App.serverURL);
 
 		App.socket.on('ask_username', function (data) {
 			console.log("Socket.io asking for logged in username:", App.User.get('username'));

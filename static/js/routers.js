@@ -79,7 +79,7 @@ App.Routers.main = Backbone.Router.extend({
 			var _this = this;
 			if (!window.App.User) {
 				// User not known, check with server to see if already logged in
-				$.getJSON('/checklogin', function (resp) {
+				$.getJSON(App.serverURL+'/checklogin', function (resp) {
 
 					console.log("Response from checklogin:", resp);
 					if (resp.status == "ok" && resp.user) {

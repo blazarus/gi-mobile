@@ -29,7 +29,7 @@ App.Models.Message = Backbone.Model.extend({
 App.Collections.UnreadMessages = Backbone.Collection.extend({
 	model: App.Models.Message,
 
-	url: '/messages/unread',
+	url: App.serverURL+'/messages/unread',
 
 	initialize: function () {
 
@@ -45,7 +45,7 @@ App.Collections.ReadMessages = Backbone.Collection.extend({
 	model: App.Models.Message,
 
 	url: function () {
-		var url = '/messages/read';
+		var url = App.serverURL+'/messages/read';
 		if (this.start !== undefined && this.end !== undefined) {
 			url += '/' + this.start + '/' + (this.start-this.end);
 		}
@@ -78,7 +78,7 @@ App.Models.User = Backbone.Model.extend({
 			username: this.get('username')
 		};
 		params = $.param(params);
-		return '/user?' + params;
+		return App.serverURL+'/user?' + params;
 	},
 
 	initialize: function () {
@@ -123,7 +123,7 @@ App.Models.User = Backbone.Model.extend({
 	checkUsername: function (success, failure) {
 		// Validate that this is a legit media lab user
 		var _this = this;
-		$.getJSON('/checkuser', {username: this.get("username")}, function (resp) {
+		$.getJSON(App.serverURL+'/checkuser', {username: this.get("username")}, function (resp) {
 			console.log("Response from checking username:", resp);
 			if (resp.status === "ok") {
 				success();
@@ -171,7 +171,7 @@ App.Models.User = Backbone.Model.extend({
 			});
 			
 		} else {
-			$.getJSON('/dummyloc/getloc', function (resp) {
+			$.getJSON(App.serverURL+'/dummyloc/getloc', function (resp) {
 				// console.log("response from /lastloc (w/ dummy locaction):", resp);
 				if (resp.status == "ok" && resp.loc) {
 					var loc = App.locations.getOrCreate(resp.loc);
@@ -191,7 +191,7 @@ App.Models.User = Backbone.Model.extend({
 		// Mark msg read and persist in backend
 		var id = msg.get('_id');
 
-		$.post('/messages/read/'+id, function (resp) {
+		$.post(App.serverURL+'/messages/read/'+id, function (resp) {
 			console.log("Response from markign message as read:", resp);
 		});
 
@@ -280,7 +280,7 @@ App.Collections.FollowingList = Backbone.Collection.extend({
 
 App.Models.Location = Backbone.Model.extend({
 	url: function () {
-		return '/locations/' + this.get('screenid');
+		return App.serverURL+'/locations/' + this.get('screenid');
 	},
 
 	initialize: function () {
@@ -301,7 +301,7 @@ App.Models.Location = Backbone.Model.extend({
 });
 
 App.Collections.Locations = App.Collections.Pool.extend({
-	url: '/locations/all',
+	url: App.serverURL+'/locations/all',
 
 	model: App.Models.Location,
 
@@ -320,7 +320,7 @@ App.Collections.Locations = App.Collections.Pool.extend({
 
 App.Models.Group = Backbone.Model.extend({
 	url: function () {
-		return '/groups/' + this.get('groupid');
+		return App.serverURL+'/groups/' + this.get('groupid');
 	},
 
 	initialize: function () {
@@ -338,7 +338,7 @@ App.Models.Group = Backbone.Model.extend({
 
 App.Models.Project = Backbone.Model.extend({
 	url: function () {
-		return '/projects/' + this.get('pid');
+		return App.serverURL+'/projects/' + this.get('pid');
 	},
 	parse: function (response) {
 		if ('project' in response) return response.project;
@@ -347,7 +347,7 @@ App.Models.Project = Backbone.Model.extend({
 
 App.Collections.Charms = Backbone.Collection.extend({
 	url: function () {
-		return '/user/'+ this.user.get('username') + '/charms';
+		return App.serverURL+'/user/'+ this.user.get('username') + '/charms';
 	},
 
 	initialize: function () {

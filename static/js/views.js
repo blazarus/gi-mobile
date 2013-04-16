@@ -218,7 +218,7 @@ App.Views.PostMessageView = Backbone.View.extend({
 		var _this = this;
 		e.preventDefault();
 		console.log($("form").serialize(), this);
-		$.post('/messages/create', $("form").serialize(), function (resp) {
+		$.post(App.serverURL+'/messages/create', $("form").serialize(), function (resp) {
 			console.log("resp:", resp);
 			if (resp.status == "error") alert(resp.msg);
 			_this.$("input#send-to").select();
@@ -252,7 +252,7 @@ App.Views.LoginView = Backbone.View.extend({
 
 	submitLogin: function (e) {
 		e.preventDefault();
-		$.post('/login', this.$el.serialize(), function (resp) {
+		$.post(App.serverURL+'/login', this.$el.serialize(), function (resp) {
 			console.log(resp);
 
 			if (resp.status == "ok" && resp.user) {
