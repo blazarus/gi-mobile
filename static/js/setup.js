@@ -17,7 +17,9 @@ window.App = {
 		"message": null,
 		"postMessage": null,
 		"locate": null,
-		"locateListElem": null
+		"locateListElem": null,
+		"viewCharms": null,
+		"charmListElem": null
 	},
 	User: null, // The logged in user (null when not logged in)
 	options: {

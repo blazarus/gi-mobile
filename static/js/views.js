@@ -386,7 +386,8 @@ App.Views.LocateUserView = Backbone.View.extend({
 });
 
 App.Views.ProjectBrowser = Backbone.View.extend({
-	el: "#project-browser",
+	tagName: "div",
+	id: "#project-browser",
 
 	states: {
 		NOLOC: "noloc", // No location yet, show all groups
@@ -400,13 +401,12 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 	subViews: [],
 
 	initialize: function (options) {
+		this.router = options.router;
 		this.user = options.user;
 		this.locations = options.locations;
 		this.state = this.states.LOC;
 		this.node = this.user.get('location');
 		this.listenTo(this.user, 'change:location', this.updateLoc);
-		this.render();
-
 	},
 
 	updateLoc: function () {
@@ -416,16 +416,19 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		} else {
 			this.state = this.states.LOC;
 		}
+		this.router.navigate('/project-browser/'+this.node.get('screenid'));
 		this.render();
 	},
 
 	showGroup: function (group) {
+		this.router.navigate('/project-browser/group/'+group.get('groupid'));
 		this.node = group;
 		this.state = this.states.GROUP;
 		this.render();
 	},
 
 	showProject: function (project) {
+		this.router.navigate('/project-browser/project/'+project.get('pid'));
 		this.node = project;
 		this.state = this.states.PROJ;
 		this.render();
@@ -544,6 +547,45 @@ App.Views.ProjectBrowser.Button = Backbone.View.extend({
 
 	render: function () {
 		this.$el.text(this.model.get('name'));
+		return this;
+	}
+});
+
+App.Views.Charms = Backbone.View.extend({
+	el: "#viewcharms",
+
+	initialize: function () {
+		this.listenTo(this.collection, 'add remove', this.render);
+	},
+
+	render: function () {
+		this.$("ul#charms-list").empty();
+		var container = $(document.createDocumentFragment());
+		_.each(this.collection.models, function (model) {
+			var subView = new App.Views.CharmListElem({ model: model });
+			container.append(subView.render().$el);
+		});
+
+		this.$("ul#charms-list").append(container);
+		return this;
+	}
+});
+
+App.Views.CharmListElem = Backbone.View.extend({
+	tagName: "li",
+
+	initialize: function () {
+		this.listenTo(this.model, 'change', this.render);
+	},
+
+	template: function () {
+		return _.template(App.Templates.charmListElem);
+	},
+
+	render: function () {
+		var tplt = this.template()(this.model.attributes);
+		this.$el.html(tplt);
+
 		return this;
 	}
 });

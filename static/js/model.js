@@ -345,6 +345,24 @@ App.Models.Project = Backbone.Model.extend({
 	}
 });
 
+App.Collections.Charms = Backbone.Collection.extend({
+	url: function () {
+		return '/user/'+ this.user.get('username') + '/charms';
+	},
+
+	initialize: function () {
+		this.user = App.User;
+	},
+
+	parse: function (response) {
+		if ('charms' in response) response = response.charms;
+		for (var i=0; i < response.length; i++) {
+			response[i].project = new App.Models.Project(response[i].project);
+		}
+		return response;
+	}
+});	
+
 
 
 

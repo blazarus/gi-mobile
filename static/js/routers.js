@@ -9,14 +9,16 @@ App.Routers.main = Backbone.Router.extend({
 		"messages/view/read": "readMessages",
 		"messages/post": "postMessage",
 		"locate": "locate",
-		"project-browser": "browseProjects"
+		"project-browser": "browseProjects",
+		"project-browser/*path": "browseProjects",
+		"charms": "viewCharms"
 	},
 
 	urlFor: {
 		// Built by this.buildReverseLookup()
 	},
 
-	requiresLogin: ["browseProjects", "unreadMessages", "readMessages", "postMessage", "locate"],
+	requiresLogin: ["browseProjects", "unreadMessages", "readMessages", "postMessage", "locate", "viewCharms"],
 
 	initialize: function () {
 		this.buildReverseLookup();
@@ -106,11 +108,9 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	browseProjects: function () {
-		$(".main-content").html($("<div>").attr("id", "project-browser"));
-		App.projectBrowserView = new App.Views.ProjectBrowser({ 
-			user: App.User,
-			locations: App.locations
-		});
+		var rtr = App.projectBrowserRouter = new App.Routers.ProjectBrowser();
+		Backbone.history.stop();
+		Backbone.history.start({pushState: true});
 
 		$("nav li").removeClass("active");
 		$("nav li#projectBrowser").addClass("active");
@@ -181,7 +181,7 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	locate: function () {
-		console.log("navigating to locate user", window.App.Templates.locate);
+		console.log("navigating to locate user");
 		$(".main-content").html($(window.App.Templates.locate));
 		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
 
@@ -190,17 +190,24 @@ App.Routers.main = Backbone.Router.extend({
 
 	},
 
-	// locate: function () {
-	// 	console.log("navigating to locate user", window.App.Templates.locate);
-	// 	$(".main-content").html($(window.App.Templates.locate));
+	viewCharms: function () {
+		console.log("navigating to locate user");
+		$(".main-content").html($(window.App.Templates.viewCharms));
+		App.charms = new App.Collections.Charms();
+		App.charms.fetch({
+			success: function (collection, response, options) {
+				App.charmsView = new App.Views.Charms({ collection: collection });
+				App.charmsView.render();
+			},
+			error: function (collection, response, options) {
+				console.log("Error in fetch:", collection, response);
+			}
+		});
 
-	// 	console.log("App.User:", App.User);
-	// 	App.userInfoView = new App.Views.UserView({ model: App.User });
+		$("nav li").removeClass("active");
+		$("nav li#charms").addClass("active");
 
-	// 	App.followingUsers = new App.Collections.FollowingList();
-	// 	App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
-
-	// },
+	},
 
 	showLogin: function() {
 		console.log("navigating to login");
@@ -210,3 +217,29 @@ App.Routers.main = Backbone.Router.extend({
 	}
 
 });
+
+App.Routers.ProjectBrowser = Backbone.Router.extend({
+	routes: {
+		"project-browser": "showDefault",
+		"project-browser/location/:screenid": "showLocation",
+		"project-browser/:screenid": "showLocation"
+	},
+
+	initialize: function () {
+		App.projectBrowserView = new App.Views.ProjectBrowser({ 
+			user: App.User,
+			locations: App.locations,
+			router: this
+		});
+	},
+
+	showDefault: function () {
+		$(".main-content").html(App.projectBrowserView.render().$el);
+		
+	},
+
+	showLocation: function (screenid) {
+		$(".main-content").html(App.projectBrowserView.render().$el);
+	}
+
+})

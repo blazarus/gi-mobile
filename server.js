@@ -506,7 +506,7 @@ var updateProjectsForGroup = function (group, successCallback) {
 					successCallback();
 				});
 			}
-		}
+		};
 
 		for (var i=0,project; project=body.res[i]; i++) {
 			(function (project) {
@@ -583,6 +583,114 @@ var updateProjectInfo = function (project, successCallback) {
 			clog("Successfully updated project info", project);
 			successCallback(project);
 		});
+
+	});
+};
+
+app.get('/user/:username/charms', function (req, res) {
+	var username = req.params.username.trim();
+	clog("fetching charms for user with username:", username);
+	User.findOne({username: username}).populate('charms.project').exec(function (err, user) {
+		if (err) {
+			clog("Error finding user:", username, err);
+			return res.send(500, "Something went wrong: " + err);
+		} else if (!user) {
+			clog("Couldn't find user with username", username);
+			return res.send(500, "Something went wrong");
+		}
+		clog("Found user in DB:", user);
+
+		var success = function () {
+			clog("user:", user);
+			res.json({ status: 'ok', charms: user.charms });
+		};
+
+		if (user.charms && user.charms.length > 0) {
+			// Have the projects cached in DB, return those
+			success();
+			// update the cache after sending the response
+			updateCharmsForUser(user, success);
+		} else {
+			// Need to look up the projects
+			updateCharmsForUser(user, success);
+		}
+	});
+});
+
+var updateCharmsForUser = function (user, successCallback) {
+	var url = "http://tagnet.media.mit.edu/charms?user_name=" + user.username;
+	request.get(url, function (err, response, body) {
+		if (err)  return clog("Got error checking charms:", err);
+		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
+		body = JSON.parse(body);
+		if (body.charms.length == 0 && body.error) return clog("Got error from tagnet:", body.error);
+		var count = 0, target = body.charms.length;
+
+		var seenCharms = {};
+
+		for (var i=0; i < user.charms.length; i++) {
+			var charm = user.charms[i].project;
+			seenCharms[charm] = true;
+		}
+
+		clog("seenCharms:", seenCharms);
+
+		var updateUser = function (proj) {
+
+			if (proj._id in seenCharms) {
+				clog("Project already in charms, so skip it");
+			} else {
+				clog("Project not already in charms, so add it");
+				var charm = {
+					project: proj,
+					addedWithMobile: false
+				};
+				user.charms.push(charm);
+				seenCharms[proj._id] = true;
+				clog("seenCharms:", seenCharms);
+			}
+			if (++count >= target) {
+				// Only save once all of the groups have been added
+				user.save(function (err) {
+					if (err) return clog("Error saving User:", err);
+					clog("Successfully updated user to include charms", user);
+					successCallback();
+				});
+			}
+		};
+
+		for (var i=0,project; project=body.charms[i]; i++) {
+			if ('id' in project && 'projectname' in project) {
+				(function (project) {
+					clog("Project:", project.id, project.projectname);
+					Project.findOne({ pid: project.id, name: project.projectname }, function (err, proj) {
+						if (err) return clog("Error trying to find project in DB:", err);
+						if (!proj) {
+							// Need to create project
+							clog("Project was null, so create it..");
+							proj = new Project({
+								pid: project.id,
+								name: project.projectname
+							});
+							proj.save(function (err) {
+								if (err) return clog("Error trying to save project in DB:", err);
+								clog(proj);
+								updateUser(proj);
+							});
+						} else {
+							// Project saved, but need to add it to location
+							clog("Found project in DB:", proj);
+							updateUser(proj);
+						}
+						
+					});
+				})(project); // Seal in value for project
+			} else {
+				// skip this one, but make sure to increase the count
+				count++;
+				continue;
+			}
+		}
 
 	});
 }

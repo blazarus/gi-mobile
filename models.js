@@ -58,6 +58,11 @@ var UserSchema = new Schema({
 	readMessages: [{
 		readAt: { type: Date, default: Date.now},
 		message: { type: Schema.Types.ObjectId, ref: 'Message', required: true }
+	}],
+	charms: [{
+		project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+		addedAt: { type: Date, default: Date.now },
+		addedWithMobile: { type: Boolean, required: true }
 	}]
 });
 
@@ -71,15 +76,30 @@ var MessageSchema = new Schema({
 });
 
 UserSchema.pre('save', function (next) {
-	var seen = {};
+	var seenMessages = {};
 
 	for (var i=0, elem; elem=this.readMessages[i]; i++) {
 		elem = elem.message;
-		if (elem in seen) {
+		if (elem in seenMessages) {
 			var err = new Error('This message has aleady been marked read: ' + elem);
 			next(err);
 		} else {
-			seen[elem]=true;
+			seenMessages[elem]=true;
+		}
+	}
+	next();
+});
+
+UserSchema.pre('save', function (next) {
+	var seenCharms = {};
+
+	for (var i=0, elem; elem=this.charms[i]; i++) {
+		elem = elem.project;
+		if (elem in seenCharms) {
+			var err = new Error('This charm has already been added: ' + elem);
+			next(err);
+		} else {
+			seenCharms[elem]=true;
 		}
 	}
 	next();
