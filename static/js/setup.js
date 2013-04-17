@@ -130,7 +130,6 @@ window.App = {
 		App.socket.on('msg', function (data) {
 			console.log("Got a new message:", data);
 			App.socket.emit('ack', { status: 'received' });
-			javascript:debugger;
 			App.unreadMsgs.unshift(new App.Models.Message(data.msg, { parse: true }));
 		});
 	}

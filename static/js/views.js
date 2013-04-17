@@ -121,7 +121,7 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 	},
 
 	newMessage: function (msg) {
-		javascript:debugger;
+		// javascript:debugger;
 	},
 
 	checkMsg: function () {

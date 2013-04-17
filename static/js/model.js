@@ -154,7 +154,7 @@ App.Models.User = Backbone.Model.extend({
 			$.getJSON('/dummyloc/getloc', function (resp) {
 				// console.log("response from /lastloc (w/ dummy locaction):", resp);
 				if (resp.status == "ok" && resp.loc) {
-					var loc = App.locations.getOrCreate(resp.loc);
+					var loc = App.locations.get(resp.loc.screenid);
 					if (_this.get('location') != loc) {
 						console.log("Updating location for", _this.get('username'), loc);
 						_this.set({

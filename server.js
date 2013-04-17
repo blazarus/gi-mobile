@@ -112,6 +112,7 @@ app.post('/user/location/update', function (req, res) {
 				// update session user obj
 				req.session.user = user;
 				clog("Updated user location info in DB:", req.session.user);
+				eventEmitter.emit('location_updated', user);
 				return res.json({ status: 'ok' });
 			});
 		})
@@ -193,16 +194,16 @@ var validateUserList = function (usernames, success, failure) {
 	}
 }
 
-// app.get('/checklogin', function (req, res) {
-// 	clog("checking login");
-// 	if (req.session.user) {
-// 		clog("User already logged in");
-// 		res.json({status: 'ok', user: req.session.user });
-// 	} else {
-// 		clog("User not logged in");
-// 		res.json({status: 'no_login'});
-// 	}
-// });
+app.get('/checklogin', function (req, res) {
+	clog("checking login");
+	if (req.session.user) {
+		clog("User already logged in");
+		res.json({status: 'ok', user: req.session.user });
+	} else {
+		clog("User not logged in");
+		res.json({status: 'no_login'});
+	}
+});
 
 app.post('/messages/create', function (req, res) {
 	clog("Creating new message:", req.body);
@@ -282,7 +283,7 @@ app.get('/messages/unread/:skip?/:limit?', function (req, res) {
 	clog("Getting new/unread messages for user");
 	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
 	Message
-		.find({to: req.session.user._id })
+		.find({to: req.session.user._id, triggerLocs: req.session.user.currloc })
 		.where('_id').nin(readMsgIds)
 		.sort('-createdAt')
 		.skip(req.params.skip ? req.params.skip : 0)
@@ -759,6 +760,42 @@ app.get('/*', function(req, res){
 	});
 });
 
+eventEmitter.on('location_updated', function (user) {
+	// get correct socket
+	var clients = io.sockets.clients();
+	for (var i=0,socket; socket=clients[i]; i++) {
+		(function (socket) {
+			socket.get('username', function (err, username) {
+				if (err) return clog("Error getting username from socket.");
+				if (username == user.username) {
+					checkForMessage(socket, user);
+				}
+			});
+		})(socket);
+	}
+});
+
+var checkForMessage = function (socket, user) {
+	var readMsgIds = _.pluck(user.readMessages, 'message');
+	clog("readMsgIds:", readMsgIds);
+	Message
+		.find({to: user._id, triggerLocs: user.currloc })
+		.where('_id').nin(readMsgIds)
+		.sort('-createdAt')
+		.populate('to', 'username')
+		.populate('sender', 'username')
+		.populate('triggerLocs', 'screenid')
+		.exec(function (err, msgs) {
+			if (err) {
+				return clog("Error while retrieving unread messages:", err);
+			}
+			clog("New messages ready to be delivered");
+			for (var i=0,msg; msg=msgs[i]; i++) {
+				socket.emit('msg', { msg: msg });			
+			}
+		});
+}
+
 eventEmitter.on("newMsg", function (msg) {
 	// Loop through all of the connected clients to see if the new message
 	// is relevant for them, and if so send it over socket.io
@@ -768,24 +805,17 @@ eventEmitter.on("newMsg", function (msg) {
 		(function (socket) {
 			clog("Event emitted for recently posted message:", msg, socket.id);
 			socket.get('username', function (err, uname) {
-				if (err) return clog("Error getting username from socket:", err);
-
-				Message
-				.findOne(msg)
-				.populate('to', 'username')
-				.populate('sender', 'username')
-				.populate('triggerLocs', 'screenid')
-				.exec(function (err, theMsg) {
-					if (err) return clog("Error finding the message");
-					clog("The message that will be delivered to the client:", uname, theMsg);
-					clog(theMsg.to);
-					if (_.contains(_.pluck(theMsg.to, 'username'), uname)) {
-						clog("passed the test");
-						socket.emit('msg', { msg: theMsg });				
-					} else {
-						clog("Message not sent to this client");
-					}
-				});
+				if (err) clog("Error getting username from socket:", err);
+				else {
+					User.findOne({username: uname}, function (err, user) {
+						if (err) clog("Error finding user in DB:", err);
+						else if (!user) clog("User was null from DB");
+						else {
+							checkForMessage(socket, user);
+						}
+					});
+				}
+				
 			});
 		})(socket); // seal in value for 'socket'
 	}	
