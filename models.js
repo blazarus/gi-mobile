@@ -1,9 +1,10 @@
 var mongoose = require('mongoose'),
-	request  = require('request');
+	request  = require('request'),
+	utils    = require('./utils');
 mongoose.connect('mongodb://localhost/gi_companion');
 
 // alias console.log
-var clog = console.log;
+var clog = utils.clog;
 
 var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
@@ -56,6 +57,8 @@ var ProjectSchema = new Schema({
 
 var UserSchema = new Schema({
 	username: { type: String, unique: true, required: true, trim: true },
+	currloc: { type: Schema.Types.ObjectId, ref: 'Location' },
+	lastseen: { type: Date },
 	readMessages: [{
 		readAt: { type: Date, default: Date.now},
 		message: { type: Schema.Types.ObjectId, ref: 'Message', required: true }

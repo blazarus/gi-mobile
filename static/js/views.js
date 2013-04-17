@@ -77,6 +77,14 @@ App.Views.ReadMessages = Backbone.View.extend({
 	}
 });
 
+App.Views.UnreadMessages = Backbone.View.extend({
+	el: ".main-content",
+
+	initialize: function () {
+
+	}
+});
+
 App.Views.MessageList = Backbone.View.extend({
 	el: "#messages-list",
 
@@ -102,12 +110,22 @@ App.Views.MessageList = Backbone.View.extend({
 	}
 });
 
-App.Views.NewMsg = Backbone.View.extend({
+App.Views.NewMessageAlert = Backbone.View.extend({
 	// Deals with popping up new messages
 	el: ".main-content",
 
-	initialize: function () {
-		this.listenTo(this.collection, 'add', this.displayMsg);
+	initialize: function (options) {
+		this.user = this.options.user;
+		this.listenTo(this.collection, 'add', this.newMessage);
+		this.listenTo(this.user, 'change:location', this.checkMsg);
+	},
+
+	newMessage: function (msg) {
+		javascript:debugger;
+	},
+
+	checkMsg: function () {
+
 	},
 
 	displayMsg: function (msg) {
@@ -217,7 +235,7 @@ App.Views.PostMessageView = Backbone.View.extend({
 	submitMessage: function (e) {
 		var _this = this;
 		e.preventDefault();
-		console.log($("form").serialize(), this);
+		console.log("Submitting new message. Serialized form:", $("form").serialize(), this);
 		$.post('/messages/create', $("form").serialize(), function (resp) {
 			console.log("resp:", resp);
 			if (resp.status == "error") alert(resp.msg);
@@ -252,14 +270,17 @@ App.Views.LoginView = Backbone.View.extend({
 
 	submitLogin: function (e) {
 		e.preventDefault();
+		$("#loader").show();
 		$.post('/login', this.$el.serialize(), function (resp) {
 			console.log(resp);
 
 			if (resp.status == "ok" && resp.user) {
-				window.App.User = App.allUsers.getOrCreate(resp.user);
+				App.User = new App.Models.LoggedInUser(resp.user);
+				App.allUsers.add(App.User);
 				App.EventDispatcher.trigger('login_success');
 				App.router.navigate("", { trigger: true });
 			} else {
+				$("#loader").hide();
 				alert(resp.msg);
 			}
 		});
@@ -276,12 +297,31 @@ App.Views.UserView = Backbone.View.extend({
 		this.render();
 	},
 
+	template: function (params) {
+		return _.template(window.App.Templates.userinfo)(params);
+	},
+
 	render: function () {
-		this.$el.css('visibility', 'visible');
-		this.$("#username").text(this.model.get('username'));
+		// this.$el.css('visibility', 'visible');
+		var uname = this.model.get('username')
 		var loc = this.model.get('location');
 		var locText = loc ? loc.get('screenid') : "Searching...";
-		this.$("#currloc").text(locText);
+		var lastseen = this.model.get('tstamp');
+		var stale = this.model.isStale();
+
+
+		var params = {
+			username: uname,
+			currloc: locText,
+			lastseen: lastseen,
+			stale: this.model.isStale()
+		};
+
+		var t = this.template(params);
+		this.$el.html($(t));
+		// this.$("#username").text(this.model.get('username'));
+		// this.$("#currloc").text(locText);
+		// this.$("#lastseen").text(lastseen);
 
 		return this;
 	}
@@ -338,17 +378,15 @@ App.Views.LocateUserView = Backbone.View.extend({
 		console.log("Initializing LocateUserView");
 
 		this.listenTo(this.collection, 'add remove', this.render);
-
-		this.render();
 	},
 
 	addUser: function (e) {
 		e.preventDefault();
 		var uname = this.$("#add-user input#username").val();
 		console.log("Trying to add user:", uname);
-		var newUser = App.allUsers.getOrCreate({username: uname});
-		console.log("newUser:", newUser);
-		this.collection.add(newUser);
+		var user = App.allUsers.getOrCreate({username: uname});
+		console.log("user:", user);
+		this.collection.add(user);
 		console.log("followingUsers:", App.followingUsers);
 		this.$("#add-user input#username").val("").focus();
 		return this;

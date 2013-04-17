@@ -11,7 +11,8 @@ App.Routers.main = Backbone.Router.extend({
 		"locate": "locate",
 		"project-browser": "browseProjects",
 		"project-browser/*path": "browseProjects",
-		"charms": "viewCharms"
+		"charms": "viewCharms",
+		"logout": "logout"
 	},
 
 	urlFor: {
@@ -76,6 +77,7 @@ App.Routers.main = Backbone.Router.extend({
 		return function () {
 
 			console.log("Checking login status");
+			$("#loader").show();
 			var _this = this;
 			if (!window.App.User) {
 				// User not known, check with server to see if already logged in
@@ -83,7 +85,8 @@ App.Routers.main = Backbone.Router.extend({
 
 					console.log("Response from checklogin:", resp);
 					if (resp.status == "ok" && resp.user) {
-						window.App.User = App.allUsers.getOrCreate(resp.user, { fetch: false });
+						App.User = new App.Models.LoggedInUser(resp.user);
+						App.allUsers.add(App.User);						
 						console.log("User logged in, continue. The user:", App.User);
 
 						App.EventDispatcher.trigger('login_success');
@@ -103,6 +106,10 @@ App.Routers.main = Backbone.Router.extend({
 		}
 	},
 
+	logout: function () {
+		if (App.User) App.User.logout();
+	},
+
 	index: function () {
 		this.navigate("messages/view/read", { trigger: true });
 	},
@@ -120,6 +127,7 @@ App.Routers.main = Backbone.Router.extend({
 
 	unreadMessages: function () {
 		console.log("Navigating to unread/new messages");
+		$("#loader").show();
 
 		$(".main-content").html($(window.App.Templates.unreadMessages));
 		$("nav li").removeClass("active");
@@ -132,12 +140,14 @@ App.Routers.main = Backbone.Router.extend({
 				collection: App.unreadMsgs,
 				messageView: App.Views.NewMessage
 			}).render();
+			$("#loader").hide();
 		} else {
 			App.EventDispatcher.on('newMsgsLoaded', function () {
 				App.newMsgListView = new App.Views.MessageList({
 					collection: App.unreadMsgs,
 					messageView: App.Views.NewMessage
 				}).render();
+				$("#loader").hide();
 			});
 		}
 		
@@ -145,6 +155,7 @@ App.Routers.main = Backbone.Router.extend({
 
 	readMessages: function () {
 		console.log("navigating to old/read messages");
+		$("#loader").show();
 
 		$("nav li").removeClass("active");
 		$("nav li#readMessages").addClass("active");
@@ -164,6 +175,7 @@ App.Routers.main = Backbone.Router.extend({
 					resultsPerPage: resultsPerPage
 				})
 				.render();
+				$("#loader").hide();
 			},
 			error: function (collection, response, options) {
 				console.log("Error in fetch:", collection, response);
@@ -173,9 +185,17 @@ App.Routers.main = Backbone.Router.extend({
 
 	postMessage: function () {
 		console.log("navigating to post message", window.App.Templates['postMessage']);
-
+		$("#loader").show();
 		$(".main-content").html($(window.App.Templates.postMessage));
 		App.postMsgView = new App.Views.PostMessageView({ collection: App.locations });
+		
+		var onLoaded = function () {
+			App.postMsgView.render();
+			$("#loader").hide();
+		};
+		if (App.locations.fetched) onLoaded();
+		else App.postMsgView.listenToOnce(App.locations, 'fetched', onLoaded);
+
 
 		$("nav li").removeClass("active");
 		$("nav li#postMessages").addClass("active");
@@ -186,6 +206,8 @@ App.Routers.main = Backbone.Router.extend({
 		console.log("navigating to locate user");
 		$(".main-content").html($(window.App.Templates.locate));
 		App.locateView = new App.Views.LocateUserView({ collection: App.followingUsers });
+		App.locateView.render();
+		$("#loader").hide();
 
 		$("nav li").removeClass("active");
 		$("nav li#locate").addClass("active");
@@ -193,13 +215,14 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	viewCharms: function () {
-		console.log("navigating to locate user");
+		console.log("navigating to view charms");
 		$(".main-content").html($(window.App.Templates.viewCharms));
 		App.charms = new App.Collections.Charms();
 		App.charms.fetch({
 			success: function (collection, response, options) {
 				App.charmsView = new App.Views.Charms({ collection: collection });
 				App.charmsView.render();
+				$("#loader").hide();
 			},
 			error: function (collection, response, options) {
 				console.log("Error in fetch:", collection, response);
@@ -212,6 +235,7 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	showLogin: function() {
+		$("#loader").hide();
 		console.log("navigating to login");
 		var tmpl = _.template(window.App.Templates.login)();
 		$(".main-content").html(tmpl);
@@ -245,37 +269,59 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 	},
 
 	showDefault: function () {
-		var screenid = App.User.get('location').get('screenid');
+		$("#loader").show();
+		var screenid = "NONE";
+		if (!App.User.isStale()) {
+			screenid = App.User.get('location').get('screenid');
+		} 
 		this.showLocation(screenid);
 		this.navigate('/project-browser/'+screenid);
 	},
 
 	showLocation: function (screenid) {
-		var location = new App.Models.Location({ screenid: screenid });
+		var loader = $("#loader").show();
+		var location = App.locations.get(screenid);
 		location.fetch({
 			success: function (model, response, options) {
 				$(".main-content").html(App.projectBrowserView.$el);
 				App.projectBrowserView.showLoc(model);
+				loader.hide();
+			},
+			error: function (model, response, options) {
+				loader.hide();
+				alert("Error loading groups for this location.");
 			}
 		});
 	},
 
 	showGroup: function (groupid) {
+		var loader = $("#loader").show();
 		var group = new App.Models.Group({ groupid: groupid });
 		group.fetch({
 			success: function (model, response, options) {
 				$(".main-content").html(App.projectBrowserView.$el);
 				App.projectBrowserView.showGroup(model);
-			}
+				loader.hide();
+			},
+			error: function (model, response, options) {
+				loader.hide();
+				alert("Error loading projects for this group.");
+			} 
 		});
 	},
 
 	showProject: function (pid) {
+		var loader = $("#loader").show();
 		var project = new App.Models.Project({ pid: pid });
 		project.fetch({
 			success: function (model, response, options) {
 				$(".main-content").html(App.projectBrowserView.$el);
 				App.projectBrowserView.showProject(model);
+				loader.hide();
+			},
+			error: function (model, response, options) {
+				loader.hide();
+				alert("Error loading project info.");
 			}
 		});
 	}
