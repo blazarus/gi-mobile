@@ -97,7 +97,6 @@ app.post('/user/location/update', function (req, res) {
 			clog("Error getting loc from DB:", err, loc);
 			return res.json({ status: 'error', msg: 'Error getting location from DB' });
 		}
-		clog("Loc:", loc);
 		User.findOne({ username: req.session.user.username }, function (err, user) {
 			if (err || !user) {
 				clog("Error getting user from DB:", err, user);
@@ -105,7 +104,6 @@ app.post('/user/location/update', function (req, res) {
 			}
 			user.currloc = loc._id;
 			user.lastseen = lastseen;
-			clog("User:", user);
 			user.save(function (err) {
 				if (err) {
 					clog("Error saving user:", err, user);
@@ -195,16 +193,16 @@ var validateUserList = function (usernames, success, failure) {
 	}
 }
 
-app.get('/checklogin', function (req, res) {
-	clog("checking login");
-	if (req.session.user) {
-		clog("User already logged in");
-		res.json({status: 'ok', user: req.session.user });
-	} else {
-		clog("User not logged in");
-		res.json({status: 'no_login'});
-	}
-});
+// app.get('/checklogin', function (req, res) {
+// 	clog("checking login");
+// 	if (req.session.user) {
+// 		clog("User already logged in");
+// 		res.json({status: 'ok', user: req.session.user });
+// 	} else {
+// 		clog("User not logged in");
+// 		res.json({status: 'no_login'});
+// 	}
+// });
 
 app.post('/messages/create', function (req, res) {
 	clog("Creating new message:", req.body);
@@ -665,7 +663,7 @@ var updateCharmsForUser = function (user, successCallback) {
 
 		var updateUser = function (proj) {
 			var charm = {
-				project: proj,
+				project: proj._id,
 				addedWithMobile: false
 			};
 			user.charms.push(charm);

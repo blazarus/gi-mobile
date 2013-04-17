@@ -11,6 +11,10 @@ db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
 	getAllLocs();
+	// newUser = new User({username: 'blazarus'})
+	// newUser.save();
+	// newUser = new User({username: 'havasi'});
+	// newUser.save();
 	// Location.find(function (err, locs) {
 	// 	for (var i=0,loc; loc=locs[i]; i++) {
 	// 		loc.remove();

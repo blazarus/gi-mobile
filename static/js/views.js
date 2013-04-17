@@ -611,7 +611,7 @@ App.Views.CharmListElem = Backbone.View.extend({
 	},
 
 	render: function () {
-		var tplt = this.template()(this.model.attributes);
+		var tplt = this.template()(this.model.get('project').attributes);
 		this.$el.html(tplt);
 
 		return this;
