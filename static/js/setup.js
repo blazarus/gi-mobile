@@ -5,7 +5,6 @@
  // javascript:debugger;
 
 window.App = {
-	serverURL: "http://0.0.0.0:8080",
 	EventDispatcher: {},
 	Models: {},
 	Collections: {},
@@ -97,7 +96,7 @@ window.App = {
 		});
 
 		// Set up socket.io
-		App.socket = io.connect('http://localhost');
+		App.socket = io.connect('/');
 
 		App.socket.on('ask_username', function (data) {
 			console.log("Socket.io asking for logged in username:", App.User.get('username'));

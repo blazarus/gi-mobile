@@ -29,7 +29,7 @@ app.use(express.bodyParser());
 app.use(express.cookieParser('\n\x0c\x86~E\\\xfe\xe1\xc5m\xd1#\x90\xfaQD\x1d\xc6]=\xf5\rd\xa1'));
 app.use(express.session());
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
-app.use(express.static(path.join(__dirname, '')));
+app.use(express.static(path.join(__dirname, 'static')));
 
 app.post('/login', function (req, res) {
 	clog("The request form:", req.body);
@@ -722,22 +722,16 @@ app.get('/dummyloc/getloc', function (req, res) {
 });
 
 app.get('/*', function(req, res){
-	res.sendfile(__dirname + '/index.html');
+	fs.readFile(__dirname + '/index.html', 'utf8', function (err, data) {
+		if (err) {
+			return console.log("Error reading index.html", err);
+		}
+		var t = _.template(data)();
+		clog("Sending rendered template");
+		res.send(t);
+	});
 });
-// app.get('/templates/:tmpl', function (req, res) {
-// 	var tmpl = req.params.tmpl;
-// 	clog("Requesting template", tmpl);
-// 	// var t = _.template
-// 	fs.readFile(__dirname + '/templates/' + tmpl + '.html', 'utf8', function (err,data) {
-// 		if (err) {
-// 			return console.log(err);
-// 		}
-// 		// console.log(data);
-// 		var t = _.template(data)();
-// 		// clog(t);
-// 		res.send(t);
-// 	});
-// });
+
 eventEmitter.on("newMsg", function (msg) {
 	// Loop through all of the connected clients to see if the new message
 	// is relevant for them, and if so send it over socket.io

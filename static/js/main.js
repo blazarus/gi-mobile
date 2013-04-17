@@ -1,7 +1,6 @@
 // javascript:debugger
 
 $( function () {
-
 	checkParams();
 
 	// Make sure templates are loaded before running main logic
