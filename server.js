@@ -603,7 +603,7 @@ app.delete('/api/charms/:pid', function (req, res) {
 	doCharmActivity(req, res, "delete");
 });
 
-app.post('/api/charms/:pid', function (req, res) {
+app.put('/api/charms/:pid', function (req, res) {
 	doCharmActivity(req, res, "add");
 });
 

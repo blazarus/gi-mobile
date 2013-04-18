@@ -489,7 +489,7 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 
 	addCharm: function () {
 		var _this = this;
-		App.charms.create({ project: this.node }, {
+		App.charms.create(this.node.attributes, {
 			success: function (model, xhr, options) {
 				_this.render();
 			},

@@ -124,8 +124,6 @@ window.App = {
 				console.log("Charms fetched:", App.charms);
 				App.charms.trigger('fetched');
 				App.charms.fetched = true;
-				App.charmsView = new App.Views.Charms({ collection: collection });
-				App.charmsView.render();
 				$("#loader").hide();
 			},
 			error: function (collection, response, options) {

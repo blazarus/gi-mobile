@@ -344,7 +344,7 @@ App.Models.Project = Backbone.Model.extend({
 App.Models.Charm = App.Models.Project.extend({
 	url: function () {
 		return '/api/charms/' + this.id;
-	},
+	}
 });
 
 App.Collections.Charms = Backbone.Collection.extend({
