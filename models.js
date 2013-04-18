@@ -1,5 +1,6 @@
 var mongoose = require('mongoose'),
 	request  = require('request'),
+	_        = require('underscore'),
 	utils    = require('./utils');
 mongoose.connect('mongodb://localhost/gi_companion');
 
@@ -59,6 +60,10 @@ var ProjectSchema = new Schema({
 	description: { type: String, trim: true }
 });
 
+// Number of milliseconds since last being seen 
+// to be considered a stale location
+var STALE = 3*60*60*1000 // 3 hours
+
 var UserSchema = new Schema({
 	username: { type: String, unique: true, required: true, trim: true },
 	currloc: { type: Schema.Types.ObjectId, ref: 'Location' },
@@ -82,6 +87,47 @@ var MessageSchema = new Schema({
 	to: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
 	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
 });
+
+UserSchema.methods.isStale = function () {
+	clog("checking if user is stale");
+	if (this.currloc && this.lastseen) {
+		var now = new Date;
+		var last = this.lastseen;
+		var diff = now.getTime() - last.getTime();
+		if (diff < STALE) return false;
+	}
+	clog("isStale returning true");
+	return true;
+};
+
+UserSchema.methods.getUnreadMessages = function (success, failure) {
+	var _this = this;
+	var readMsgIds = _.pluck(this.readMessages, 'message');
+	clog("readMsgIds:", readMsgIds);
+	Location.findOne({screenid: "NONE"}, function (err, noneLoc) {
+		Message
+		.find({to: _this._id })
+		.or([{
+			triggerLocs: _this.isStale() ? null : _this.currloc
+		},{
+			triggerLocs: noneLoc
+		}])
+		.where('_id').nin(readMsgIds)
+		.sort('-createdAt')
+		.populate('triggerLocs', 'screenid')
+		.populate('to', 'username')
+		.populate('sender', 'username')
+		.exec(function (err, msgs) {
+			if (err) {
+				clog("Error while retrieving unread messages:", err);
+				return failure(err);
+			}
+			clog("New messages ready to be delivered:", msgs);
+			success(msgs);
+		});
+	});
+	
+};
 
 UserSchema.pre('save', function (next) {
 	var seenMessages = {};

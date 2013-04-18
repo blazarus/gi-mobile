@@ -80,7 +80,7 @@ App.Models.User = Backbone.Model.extend({
 		tstamp: null,
 		// Number of milliseconds since last being seen 
 		// to be considered a stale location
-		stale: 3*60*1000 // 3 hours
+		stale: 3*60*60*1000 // 3 hours
 	},
 
 	url: function () {

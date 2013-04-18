@@ -259,6 +259,8 @@ app.get('/locations/all', function (req, res) {
 
 app.get('/messages/read/:skip?/:limit?', function (req, res) {
 	clog("Getting read/old messages for user");
+	var user = new User(req.session.user);
+	user.isStale();
 	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
 	Message
 		.find({to: req.session.user._id })
@@ -281,24 +283,37 @@ app.get('/messages/read/:skip?/:limit?', function (req, res) {
 
 app.get('/messages/unread/:skip?/:limit?', function (req, res) {
 	clog("Getting new/unread messages for user");
+	var user = new User(req.session.user);
+	clog("user:", user);
+	user.getUnreadMessages(function (msgs) {
+		res.json({status: 'ok', 'messages': msgs });
+	},
+	function (err) {
+		res.send(500, "Something went wrong: " + err);
+	});
 	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
-	Message
-		.find({to: req.session.user._id, triggerLocs: req.session.user.currloc })
-		.where('_id').nin(readMsgIds)
-		.sort('-createdAt')
-		.skip(req.params.skip ? req.params.skip : 0)
-		.limit(req.params.limit ? req.params.limit : "")
-		.populate('to', 'username')
-		.populate('sender', 'username')
-		.populate('triggerLocs', 'screenid')
-		.exec(function (err, msgs) {
-			if (err) {
-				clog("Error while retrieving unread messages:", err);
-				return res.send(500, "Something went wrong: " + err);
-			}
-			// msgs = filterMessagesUnread(msgs, req);
-			res.json({status: 'ok', 'messages': msgs });
-		});
+	// Message
+	// 	.find({to: req.session.user._id})
+	// 	.or([{
+	// 		'triggerLocs': req.session.user.currloc
+	// 	},{
+	// 		'triggerLocs.screenid': "NONE" 
+	// 	}])
+	// 	.where('_id').nin(readMsgIds)
+	// 	.sort('-createdAt')
+	// 	.skip(req.params.skip ? req.params.skip : 0)
+	// 	.limit(req.params.limit ? req.params.limit : "")
+	// 	.populate('to', 'username')
+	// 	.populate('sender', 'username')
+	// 	.populate('triggerLocs', 'screenid')
+	// 	.exec(function (err, msgs) {
+	// 		if (err) {
+	// 			clog("Error while retrieving unread messages:", err);
+	// 			return res.send(500, "Something went wrong: " + err);
+	// 		}
+	// 		// msgs = filterMessagesUnread(msgs, req);
+	// 		res.json({status: 'ok', 'messages': msgs });
+	// 	});
 });
 
 app.post('/messages/read/:id', function (req, res) {
@@ -776,24 +791,38 @@ eventEmitter.on('location_updated', function (user) {
 });
 
 var checkForMessage = function (socket, user) {
-	var readMsgIds = _.pluck(user.readMessages, 'message');
-	clog("readMsgIds:", readMsgIds);
-	Message
-		.find({to: user._id, triggerLocs: user.currloc })
-		.where('_id').nin(readMsgIds)
-		.sort('-createdAt')
-		.populate('to', 'username')
-		.populate('sender', 'username')
-		.populate('triggerLocs', 'screenid')
-		.exec(function (err, msgs) {
-			if (err) {
-				return clog("Error while retrieving unread messages:", err);
-			}
-			clog("New messages ready to be delivered");
-			for (var i=0,msg; msg=msgs[i]; i++) {
-				socket.emit('msg', { msg: msg });			
-			}
-		});
+	// user.isStale();
+	user.getUnreadMessages(function (msgs) {
+		for (var i=0,msg; msg=msgs[i]; i++) {
+			socket.emit('msg', { msg: msg });			
+		}
+	},
+	function (err) { });// do nothing
+
+	
+	// var readMsgIds = _.pluck(user.readMessages, 'message');
+	// clog("readMsgIds:", readMsgIds);
+	// Message
+	// 	.find({to: user._id})
+	// 	.or([{
+	// 		'triggerLocs': user.currloc
+	// 	},{
+	// 		'triggerLocs.screenid': "NONE" 
+	// 	}])
+	// 	.where('_id').nin(readMsgIds)
+	// 	.sort('-createdAt')
+	// 	.populate('to', 'username')
+	// 	.populate('sender', 'username')
+	// 	.populate('triggerLocs', 'screenid')
+	// 	.exec(function (err, msgs) {
+	// 		if (err) {
+	// 			return clog("Error while retrieving unread messages:", err);
+	// 		}
+	// 		clog("New messages ready to be delivered");
+	// 		for (var i=0,msg; msg=msgs[i]; i++) {
+	// 			socket.emit('msg', { msg: msg });			
+	// 		}
+	// 	});
 }
 
 eventEmitter.on("newMsg", function (msg) {
