@@ -149,7 +149,7 @@ App.Views.NewMessage = Backbone.View.extend({
 	tagName: "li",
 
 	events: {
-		"click .close": "closeMessage"
+		"click .closebtn": "closeMessage"
 	},
 
 	initialize: function () {
@@ -168,16 +168,12 @@ App.Views.NewMessage = Backbone.View.extend({
 	render: function () {
 		var tplt = this.template()(this.model.attributes);
 
-		var popup = $(tplt)
-			.prepend('<button type="button" class="close">&times;</button>');
+		var closeBtn = $("<button type='button'>")
+				.addClass('btn pull-right closebtn')
+				.text("Ok, got it! Mark as read.");
 
-		if (!!this.$el) {
-			// Element exists, so just update the html
-			this.$el.html(popup.html());
-		} else {
-			// Element not yet created, so create it
-			this.$el = popup;
-		}
+		this.$el.html(tplt).prepend(closeBtn);
+
 		return this;
 	}
 });

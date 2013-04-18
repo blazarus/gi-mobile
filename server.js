@@ -30,6 +30,17 @@ app.use(express.static(path.join(__dirname, 'static')));
 
 app.post('/login', function (req, res) {
 	clog("The request form:", req.body);
+
+	var success = function (user) {
+		req.session.user = user;
+		user.fetchRecommendations(function () {
+			clog("Successfully got recommendations");
+		}, function (err) {
+			clog("Error getting recommendations:", err);
+		});
+		res.json({ status: 'ok', user: req.session.user });
+	};
+
 	if (req.body.webcode) {
 		request.get("http://data.media.mit.edu/spm/contacts/json?web_code=" + req.body.webcode, function (err, response, body) {
 			var jsono;
@@ -42,18 +53,15 @@ app.post('/login', function (req, res) {
 					}
 
 					clog("Got user from DB:", theUser);
-					req.session.user = theUser;
-					res.json({ status: 'ok', user: req.session.user });
+					success(theUser);
 				});
 			} else {
 				res.json({ status: 'error', 'msg': 'Could not validate webcode'});
 			}
 		});
 	} else if (req.body.username) {
-		validateUsername(req.body.username, function (theUser) {
-			req.session.user = theUser;
-			res.json({ status: 'ok', user: req.session.user });
-		}, function () {
+		validateUsername(req.body.username, success, 
+		function () {
 			res.json({ status: 'error', 'msg': 'Could not validate username'});
 		});
 	} else {
@@ -292,28 +300,6 @@ app.get('/messages/unread/:skip?/:limit?', function (req, res) {
 		res.send(500, "Something went wrong: " + err);
 	});
 	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
-	// Message
-	// 	.find({to: req.session.user._id})
-	// 	.or([{
-	// 		'triggerLocs': req.session.user.currloc
-	// 	},{
-	// 		'triggerLocs.screenid': "NONE" 
-	// 	}])
-	// 	.where('_id').nin(readMsgIds)
-	// 	.sort('-createdAt')
-	// 	.skip(req.params.skip ? req.params.skip : 0)
-	// 	.limit(req.params.limit ? req.params.limit : "")
-	// 	.populate('to', 'username')
-	// 	.populate('sender', 'username')
-	// 	.populate('triggerLocs', 'screenid')
-	// 	.exec(function (err, msgs) {
-	// 		if (err) {
-	// 			clog("Error while retrieving unread messages:", err);
-	// 			return res.send(500, "Something went wrong: " + err);
-	// 		}
-	// 		// msgs = filterMessagesUnread(msgs, req);
-	// 		res.json({status: 'ok', 'messages': msgs });
-	// 	});
 });
 
 app.post('/messages/read/:id', function (req, res) {
@@ -595,39 +581,21 @@ app.get('/projects/:pid', function (req, res) {
 		var success = function () {
 			res.json({ status: 'ok', project: project });
 		};
+		var failure = function (err) {
+			return res.send(500, "Something went wrong: " + err);
+		};
 
 		if (project.description) {
 			// Have the projects cached in DB, return those
 			success();
 			// update the cache after sending the response
-			updateProjectInfo(project, function () {});
+			project.fetch(function () {}, failure);
 		} else {
 			// Need to look up the projects
-			updateProjectInfo(project, success);
+			project.fetch(success, failure);
 		}
 	});
 });
-
-var updateProjectInfo = function (project, successCallback) {
-	var url = "http://tagnet.media.mit.edu/get_project_info?projectid=" + project.pid;
-	clog("Checking tagnet for projects info,", url);
-	request.get(url, function (err, response, body) {
-		if (err)  return clog("Got error checking projects:", err);
-		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
-
-		body = JSON.parse(body);
-		// if (body.res.length == 0 && body.error) return clog("Got error from tagnet:", body.error);
-
-		project.description = body.longdescription;
-
-		project.save( function (err) {
-			if (err) return clog("Error saving Project:", err);
-			clog("Successfully updated project info", project);
-			successCallback(project);
-		});
-
-	});
-};
 
 app.get('/user/:username/charms', function (req, res) {
 	var username = req.params.username.trim();

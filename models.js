@@ -11,6 +11,11 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
+	User.find(function (err, users) {
+		for (var i=0,user; user=users[i]; i++) {
+			user.deleteAllRecs();	
+		}
+	});
 	getAllLocs();
 	// newUser = new User({username: 'blazarus'})
 	// newUser.save();
@@ -88,6 +93,16 @@ var MessageSchema = new Schema({
 	triggerLocs: [{ type: Schema.Types.ObjectId, ref: 'Location', required: true }],
 });
 
+var RecommendationSchema = new Schema({
+	createdAt: {type: Date, default: Date.now},
+	user: { type: Schema.Types.ObjectId, ref: 'User' },
+	message: { type: Schema.Types.ObjectId, ref: 'Message' },
+	project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+	weight: { type: Number, required: true }
+	// fulfilled: { type: Boolean, default: false },
+	// fulfilledAt: { type: Date }
+});
+
 UserSchema.methods.isStale = function () {
 	clog("checking if user is stale");
 	if (this.currloc && this.lastseen) {
@@ -126,7 +141,198 @@ UserSchema.methods.getUnreadMessages = function (success, failure) {
 			success(msgs);
 		});
 	});
+};
+
+UserSchema.methods.fetchRecommendations = function (success, failure) {
+	// Get recommendations from tagnet
+	var thisUser = this;
+	var limit = 20;
+	var url = "http://gi.media.mit.edu/luminoso2/match/projects?person=" + this.username + "&limit=" + limit;
+	request.get(url, function (err, response, body) {
+		if (err) {
+			clog("Got error getting recommendations:", err);
+			return failure(err);
+		} else if (response.statusCode != "200") {
+			clog("Bad response code:", response.statusCode);
+			return failure("Bad response code: "+response.statusCode)
+		}
+
+		body = JSON.parse(body);
+		if (body.matches.length == 0 && body.error) {
+			clog("Got error from tagnet:", body.error);
+			return failure("Got error from tagnet: "+ body.error)
+		}
+		clog("Recommendations:", body);
+
+		var count = 0, target = body.matches.length;
+
+		var successCallback = function () {
+			if (++count >= target) {
+				clog("Got success for all matches");
+				success();
+			}
+		};
+
+		User.getOrCreateRecommender(function (recUser) {
+			for (var i=0,match; match=body.matches[i]; i++) {
+				(function (match) {
+					var pid = match.project;
+					Project.findOne({ pid: pid }, function (err, project) {
+						if (err) {
+							clog("Error finding project:", err);
+							return failure("Error finding project: "+err);
+						}
+						if (!project) {
+							// Need to create project
+							clog("Project was null, so add it..");
+							project = new Project({ pid: pid });
+							project.fetch(function () {
+								Recommendation.create(thisUser, project, match.weight, recUser, successCallback, failure);
+							}, failure);
+						} else {
+							clog("Project already in DB:", project);
+							Recommendation.create(thisUser, project, match.weight, recUser, successCallback, failure);
+						}
+
+					});
+				})(match);
+			}
+		}, failure);
+		
+
+	});
+};
+
+UserSchema.statics.getOrCreateRecommender = function (success, failure) {
+	// Creates the special 'recommendation' user 
+	// to be used as sender in recommendation message
+	var REC_USERNAME = "RECOMMENDER";
+	User.findOne({ username: REC_USERNAME }, function (err, user) {
+		if (err) {
+			clog("Error getting user from DB:", err);
+			return failure("Error getting user from DB: " + err);
+		}
+		if (!user) {
+			// Need to create user
+			clog("RECOMMENDER user was null, so add it..");
+			user = new User({
+				username: REC_USERNAME
+			});
+			user.save(function (err) {
+				if (err) {
+					clog("Error saving RECOMMENDER user:", err);
+					return failure("Error saving RECOMMENDER user: "+ err);
+				}
+				return success(user);
+			});
+		} else {
+			return success(user);
+		}
+	});
 	
+};
+
+RecommendationSchema.methods.createMessage = function (recUser, project, success, failure) {
+	var _this = this;
+	Location.findOne({ screenid: "NONE" }, function (err, loc) {
+		clog("project passed to createMessage:", project);
+		var subject = "Project recommendation!";
+		var body = "Based on your interests, we think you should check out " + project.name;
+		if (!this.message) {
+			var message = new Message({
+				sender: recUser,
+				to: [_this.user],
+				subject: subject,
+				body: body,
+				triggerLocs: loc
+			});
+			clog("The recommendation message before saving:", message);
+			message.save(function (err) {
+				if (err) {
+					clog("Error saving recommendation message:", err);
+					return failure("Error saving recommendation message: "+ err);
+				}
+				_this.message = message;
+				success(_this);
+			});
+		}
+	});	
+};
+
+RecommendationSchema.statics.create = function (user, project, weight, recUser, success, failure) {
+	Recommendation.findOne({ user: user._id, project: project._id}, function (err, rec) {
+		if (err) {
+			clog("Error finding recommendation in DB:", err);
+			return failure("Error finding recommendation in DB: " + err);
+		}
+		if (!rec) {
+			// Need to create recommendation
+			clog("Recommendation was null, so add it..");
+			rec = new Recommendation({ 
+				user: user,
+			 	project: project,
+			 	weight: weight
+			});
+			rec.createMessage(recUser, project, function () {
+				rec.save( function (err) {
+					if (err) {
+						clog("Error saving new recommendation:", err);
+						return failure("Error saving new recommendation: " + err);
+					}
+					success(rec);
+				});
+			}, failure);
+		}
+		success(rec);
+	});
+};
+
+UserSchema.methods.deleteAllRecs = function () {
+	Recommendation.find({ user: this._id }, function (err, recs) {
+		for (var i=0,rec; rec=recs[i]; i++) {
+			Message.findOne({ _id: rec.message }, function (err, msg) {
+				msg.remove();
+			});
+			rec.remove();
+		}
+
+	});
+}
+
+ProjectSchema.methods.fetch = function (success, failure) {
+	var _this = this;
+	var url = "http://tagnet.media.mit.edu/get_project_info?projectid=" + _this.pid;
+	clog("Checking tagnet for projects info,", url);
+	request.get(url, function (err, response, body) {
+		if (err) {
+			clog("Got error checking projects:", err);
+			return failure("Got error checking projects:", err)
+		}
+		if (response.statusCode != "200") {
+			clog("Bad response code:", response.statusCode);
+			return failure("Bad response code: " + response.statusCode);
+		}
+
+		body = JSON.parse(body);
+
+		if (body.error && !body.error.match(/\*\*\*/)) {
+			clog("Tagnet returned an error:", body.error);
+			return failure("Tagnet returned an error: " + body.error);
+		}
+
+		_this.description = body.longdescription;
+		_this.name = body.projectname;
+
+		_this.save( function (err) {
+			if (err) {
+				clog("Error saving Project:", err, _this);
+				return failure("Error saving Project: " + err);
+			}
+			clog("Successfully updated project info", _this);
+			success(_this);
+		});
+
+	});
 };
 
 UserSchema.pre('save', function (next) {
@@ -173,29 +379,6 @@ LocationSchema.pre('save', function (next) {
 	}
 	next();
 });
-
-// var addLocations = function () {
-// 	var locids = [
-// 		"e14-474-1",
-// 		"e15-468-1A",
-// 		"e14-274-1",
-// 		"e15-468-1",
-// 		"e14-514-1",
-// 		"charm-6",
-// 		"NONE"
-// 	];
-
-// 	for (var i=0, id; id=locids[i]; i++) {
-// 		(function (id) {
-// 			clog("saving loc with id:", id);
-// 			var loc = new Location({ screenid: id });
-// 			loc.save(function (err, loc) {
-// 				if (err) clog("Error saving ", id, ":", err);
-// 				else clog("Saved location:", id);
-// 			});
-// 		})(id);
-// 	}
-// };
 
 var getAllLocs = function () {
 	url = "http://tagnet.media.mit.edu/rfid/api/rfid_info";
@@ -244,12 +427,14 @@ var Group = mongoose.model('Group', GroupSchema);
 var Project = mongoose.model('Project', ProjectSchema);
 var User = mongoose.model('User', UserSchema);
 var Message = mongoose.model('Message', MessageSchema);
+var Recommendation = mongoose.model('Recommendation', RecommendationSchema);
 
 exports.Location = Location;
 exports.Group = Group;
 exports.Project = Project;
 exports.User = User;
 exports.Message = Message;
+exports.Recommendation = Recommendation;
 
 
 
