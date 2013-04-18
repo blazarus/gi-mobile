@@ -607,6 +607,10 @@ app.put('/api/charms/:pid', function (req, res) {
 	doCharmActivity(req, res, "add");
 });
 
+app.post('/api/charms/:pid', function (req, res) {
+	doCharmActivity(req, res, "add");
+});
+
 var doCharmActivity = function (req, res, action) {
 	if ('user' in req.session) {
 		var pid = req.params.pid;
