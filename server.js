@@ -13,11 +13,12 @@ var express      = require('express'),
 
 var clog = utils.clog;
 
-var Location = models.Location,
-	Group    = models.Group,
-	Project  = models.Project,
-	User     = models.User,
-	Message  = models.Message;
+var Location      = models.Location,
+	Group         = models.Group,
+	Project       = models.Project,
+	User          = models.User,
+	CharmActivity = models.CharmActivity,
+	Message       = models.Message;
 
 var eventEmitter = new EventEmitter();
 
@@ -268,8 +269,8 @@ app.get('/locations/all', function (req, res) {
 app.get('/messages/read/:skip?/:limit?', function (req, res) {
 	clog("Getting read/old messages for user");
 	var user = new User(req.session.user);
-	user.isStale();
 	var readMsgIds = _.pluck(req.session.user.readMessages, 'message');
+	clog("readMsgIds:", req.session.user._id, req.params.skip, req.params.limit, readMsgIds);
 	Message
 		.find({to: req.session.user._id })
 		.where('_id').in(readMsgIds)
@@ -284,6 +285,7 @@ app.get('/messages/read/:skip?/:limit?', function (req, res) {
 				clog("Error while retrieving read messages:", err);
 				return res.send(500, "Something went wrong: " + err);
 			}
+			clog("Read messages:", msgs);
 			// msgs = filterMessagesRead(msgs, req);
 			res.json({status: 'ok', messages: msgs, total: req.session.user.readMessages.length });
 		});
@@ -597,10 +599,76 @@ app.get('/projects/:pid', function (req, res) {
 	});
 });
 
-app.get('/user/:username/charms', function (req, res) {
-	var username = req.params.username.trim();
+app.delete('/api/charms/:pid', function (req, res) {
+	doCharmActivity(req, res, "delete");
+});
+
+app.post('/api/charms/:pid', function (req, res) {
+	doCharmActivity(req, res, "add");
+});
+
+var doCharmActivity = function (req, res, action) {
+	if ('user' in req.session) {
+		var pid = req.params.pid;
+		var username = req.session.user.username;
+		var url = "http://gi-ego.media.mit.edu/" + username + "/charms";
+		var params = "id="+ pid +"&type=project&action=" + action + "&client=gimobile";
+		var method = action == "delete" ? 'DELETE' : 'POST';
+		clog("sending request to add/remove charm");
+		request({
+			method: method,
+			headers: {'content-type' : 'application/x-www-form-urlencoded'},
+			url:     url,
+			body:    params
+		}, function (err, response, body) {
+			if (err) {
+				clog("Error posting charm to gi-ego:", err);
+				return res.send(500, "Error posting charm to gi-ego: " + err);
+			} else if (response.statusCode != "200") {
+				clog("Bad response code:", response.statusCode, body);
+				return res.send(500, "Bad response code: " + response.statusCode);
+			}
+			clog("Response from adding/deleting charm:", body);
+			try {
+				body = JSON.parse(body);
+			} catch (exception){
+				clog("Exception parsing response:", err);
+				return res.send(500, "Exception parsing response: " + err);				
+			}
+
+			if (body.error) {
+				clog("Got error from gi-ego:", body.error);
+				return res.send(500, "got error from gi-ego: " + body.error);
+			}
+
+			//Errors have been handled, now add charm activity
+			Project.findOne({ pid: pid }, function (err, project) {
+				if (err || !project) {
+					clog("Error finding project in DB:", err);
+					return res.send(500, "Error finding project in DB: " + err);
+				}
+				var activity = new CharmActivity({
+					project: project,
+					action: action
+				});
+				activity.save(function (err) {
+					if (err) {
+						clog("Error saving CharmActivity:", err);
+						return res.send(500, "Error saving CharmActivity: " + err);
+					}
+					res.json({ status: 'ok' });
+				});
+				
+			});
+
+		});
+	}
+};
+
+app.get('/api/charms', function (req, res) {
+	var username = req.session.user.username.trim();
 	clog("fetching charms for user with username:", username);
-	User.findOne({username: username}).populate('charms.project').exec(function (err, user) {
+	User.findOne({username: username}).populate('charms').exec(function (err, user) {
 		if (err) {
 			clog("Error finding user:", username, err);
 			return res.send(500, "Something went wrong: " + err);
@@ -615,15 +683,7 @@ app.get('/user/:username/charms', function (req, res) {
 			res.json({ status: 'ok', charms: user.charms });
 		};
 
-		if (user.charms && user.charms.length > 0) {
-			// Have the projects cached in DB, return those
-			success();
-			// update the cache after sending the response
-			updateCharmsForUser(user, function () {});
-		} else {
-			// Need to look up the projects
-			updateCharmsForUser(user, success);
-		}
+		updateCharmsForUser(user, success);
 	});
 });
 
@@ -636,23 +696,10 @@ var updateCharmsForUser = function (user, successCallback) {
 		if (body.charms.length == 0 && body.error) return clog("Got error from tagnet:", body.error);
 		var count = 0, target = body.charms.length;
 
-		var seenCharms = {};
-
-		for (var i=0; i < user.charms.length; i++) {
-			var charm = user.charms[i].project;
-			seenCharms[charm.pid] = true;
-		}
-
-		clog("seenCharms:", seenCharms);
-
+		user.charms = [];
+		clog("Cleared user charms:", user.charms);
 		var updateUser = function (proj) {
-			var charm = {
-				project: proj._id,
-				addedWithMobile: false
-			};
-			user.charms.push(charm);
-			seenCharms[proj.pid] = true;
-			clog("seenCharms:", seenCharms);
+			user.charms.push(proj);
 			if (++count >= target) {
 				// Only save once all of the groups have been added
 				user.save(function (err) {
@@ -665,36 +712,31 @@ var updateCharmsForUser = function (user, successCallback) {
 
 		for (var i=0,project; project=body.charms[i]; i++) {
 			if ('id' in project && 'projectname' in project) {
-				if (project.id in seenCharms) {
-					clog("Project already in charms, so skip it");
-					count++;
-				} else {
-					clog("Project not already in charms, so add it");
-					(function (project) {
-						clog("Project:", project.id, project.projectname);
-						Project.findOne({ pid: project.id, name: project.projectname }, function (err, proj) {
-							if (err) return clog("Error trying to find project in DB:", err);
-							if (!proj) {
-								// Need to create project
-								clog("Project was null, so create it..");
-								proj = new Project({
-									pid: project.id,
-									name: project.projectname
-								});
-								proj.save(function (err) {
-									if (err) return clog("Error trying to save project in DB:", err);
-									clog(proj);									
-									updateUser(proj);
-								});
-							} else {
-								// Project saved, but need to add it to location
-								clog("Found project in DB:", proj);
+				clog("Project not already in charms, so add it");
+				(function (project) {
+					clog("Project:", project.id, project.projectname);
+					Project.findOne({ pid: project.id, name: project.projectname }, function (err, proj) {
+						if (err) return clog("Error trying to find project in DB:", err);
+						if (!proj) {
+							// Need to create project
+							clog("Project was null, so create it..");
+							proj = new Project({
+								pid: project.id,
+								name: project.projectname
+							});
+							proj.save(function (err) {
+								if (err) return clog("Error trying to save project in DB:", err);
+								clog(proj);									
 								updateUser(proj);
-							}
-							
-						});
-					})(project); // Seal in value for project
-				}
+							});
+						} else {
+							// Project saved, but need to add it to location
+							clog("Found project in DB:", proj);
+							updateUser(proj);
+						}
+						
+					});
+				})(project); // Seal in value for project
 				
 			} else {
 				// skip this one, but make sure to increase the count

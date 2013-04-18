@@ -1,0 +1,8 @@
+<div><%= name %></div>
+<div><%= description %></div>
+<% if (isCharmed) { %>
+<h4>You've charmed this project!</h4>
+<button class="btn remove-charm">Remove this charm</button>
+<% } else { %>
+<button class="btn add-charm">Charm this project</button>
+<% } %>

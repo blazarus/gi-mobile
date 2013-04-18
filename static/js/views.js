@@ -122,6 +122,9 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 
 	newMessage: function (msg) {
 		// javascript:debugger;
+		// Open a modal dialog saying You have a new message (or recommendation)
+		// and have two buttons - one saying go to message, which takes you to New messages tab
+		// the other saying Read later in New Messages tab
 	},
 
 	checkMsg: function () {
@@ -173,6 +176,12 @@ App.Views.NewMessage = Backbone.View.extend({
 				.text("Ok, got it! Mark as read.");
 
 		this.$el.html(tplt).prepend(closeBtn);
+
+		if (this.model.get('sender').isRecommender()) {
+			this.$el.css({
+				// background: 'red'
+			});
+		}
 
 		return this;
 	}
@@ -430,11 +439,17 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		PROJ: "project"
 	},
 
+	events: {
+		"click .add-charm": "addCharm",
+		"click .remove-charm": "removeCharm"
+	},
+
 	state: null,
 
 	subViews: [],
 
 	initialize: function (options) {
+		console.log("Initializing project browser view");
 		this.router = options.router;
 		this.user = options.user;
 		this.locations = options.locations;
@@ -472,6 +487,31 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		return this.render();
 	},
 
+	addCharm: function () {
+		var _this = this;
+		App.charms.create({ project: this.node }, {
+			success: function (model, xhr, options) {
+				_this.render();
+			},
+			error: function (model, xhr, options) {
+				alert("Problem adding charm");
+			}	
+		});
+	},
+
+	removeCharm: function () {
+		var _this = this;
+		var charm = App.charms.get(this.node);
+		charm.destroy({
+			success: function (model, xhr, options) {
+				_this.render();
+			},
+			error: function (model, xhr, options) {
+				alert("Problem removing charm");
+			}
+		});
+	},
+
 	render: function () {
 		console.log("Rendering project browser. state:", this.state);
 		this.$el.empty();
@@ -497,6 +537,8 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 				break;
 		}
 		
+		// Make sure events are bound
+		this.delegateEvents(this.events);
 
 		return this;
 	},
@@ -543,11 +585,16 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 	},
 
 	renderProject: function () {
-		var _this = this;
-		var container = $(document.createDocumentFragment()); 
-		container.append($("<div>").text(this.node.get('name')));
-		container.append($("<div>").html(this.node.get('description'))); // use .html() to decode special characters
-		_this.$el.append(container);
+		var isCharmed = !!App.charms.get(this.node);
+		
+		console.log("Is this project charmed?", isCharmed);
+
+		var tplt = _.template(App.Templates.projectInfo)({
+			name: this.node.get('name'),
+			description: this.node.get('description'),
+			isCharmed: isCharmed
+		});
+		this.$el.append($(tplt));
 
 	}
 });
@@ -607,7 +654,7 @@ App.Views.CharmListElem = Backbone.View.extend({
 	},
 
 	render: function () {
-		var tplt = this.template()(this.model.get('project').attributes);
+		var tplt = this.template()(this.model.attributes);
 		this.$el.html(tplt);
 
 		return this;

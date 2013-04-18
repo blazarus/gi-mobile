@@ -20,7 +20,8 @@ window.App = {
 		"locate": null,
 		"locateListElem": null,
 		"viewCharms": null,
-		"charmListElem": null
+		"charmListElem": null,
+		"projectInfo": null
 	},
 	User: null, // The logged in user (null when not logged in)
 	options: {
@@ -115,8 +116,22 @@ window.App = {
 		if (App.locations.fetched) {
 			fetchUnreadMsgs();
 		} else {
-			App.EventDispatcher.ListenToOnce(App.locations, 'fetched', fetchUnreadMsgs);
+			App.EventDispatcher.listenToOnce(App.locations, 'fetched', fetchUnreadMsgs);
 		}
+		App.charms = new App.Collections.Charms({ user: App.User });
+		App.charms.fetch({
+			success: function (collection, response, options) {
+				console.log("Charms fetched:", App.charms);
+				App.charms.trigger('fetched');
+				App.charms.fetched = true;
+				App.charmsView = new App.Views.Charms({ collection: collection });
+				App.charmsView.render();
+				$("#loader").hide();
+			},
+			error: function (collection, response, options) {
+				console.log("Error in fetch:", collection, response);
+			}
+		});
 
 		// Set up socket.io
 		App.socket = io.connect('/');

@@ -53,7 +53,7 @@ App.Collections.ReadMessages = Backbone.Collection.extend({
 	url: function () {
 		var url = '/messages/read';
 		if (this.start !== undefined && this.end !== undefined) {
-			url += '/' + this.start + '/' + (this.start-this.end);
+			url += '/' + this.start + '/' + (this.end-this.start);
 		}
 		return url;
 	},
@@ -114,6 +114,11 @@ App.Models.User = Backbone.Model.extend({
 		} else {
 			console.log("Something went wrong!");
 		}
+	},
+
+	isRecommender: function () {
+		// Checks if this user is the special recommender user
+		return this.get('username').toLowerCase() === "recommender";
 	},
 
 	checkLocation: function () {
@@ -268,7 +273,7 @@ App.Models.Location = Backbone.Model.extend({
 	idAttribute: "screenid",
 
 	url: function () {
-		return '/locations/' + this.get('screenid');
+		return '/locations/' + this.id;
 	},
 
 	initialize: function () {
@@ -293,8 +298,6 @@ App.Collections.Locations = Backbone.Collection.extend({
 
 	model: App.Models.Location,
 
-	findKey: 'screenid',
-
 	initialize: function () {
 
 	},
@@ -307,10 +310,10 @@ App.Collections.Locations = Backbone.Collection.extend({
 });
 
 App.Models.Group = Backbone.Model.extend({
-	idAttribute: "_id",
+	idAttribute: "groupid",
 
 	url: function () {
-		return '/groups/' + this.get('groupid');
+		return '/groups/' + this.id;
 	},
 
 	initialize: function () {
@@ -327,20 +330,27 @@ App.Models.Group = Backbone.Model.extend({
 });
 
 App.Models.Project = Backbone.Model.extend({
-	idAttribute: "_id",
+	idAttribute: "pid",
 
 	url: function () {
-		return '/projects/' + this.get('pid');
+		return '/projects/' + this.id;
 	},
 	parse: function (response) {
-		if ('project' in response) return response.project;
+		if ('project' in response) response = response.project;
+		return response;
 	}
 });
 
-App.Collections.Charms = Backbone.Collection.extend({
+App.Models.Charm = App.Models.Project.extend({
 	url: function () {
-		return '/user/'+ this.user.get('username') + '/charms';
+		return '/api/charms/' + this.id;
 	},
+});
+
+App.Collections.Charms = Backbone.Collection.extend({
+	model: App.Models.Charm,
+
+	url: '/api/charms',
 
 	initialize: function () {
 		this.user = App.User;
@@ -348,9 +358,6 @@ App.Collections.Charms = Backbone.Collection.extend({
 
 	parse: function (response) {
 		if ('charms' in response) response = response.charms;
-		for (var i=0; i < response.length; i++) {
-			response[i].project = new App.Models.Project(response[i].project);
-		}
 		return response;
 	}
 });	

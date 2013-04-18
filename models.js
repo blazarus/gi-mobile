@@ -11,12 +11,12 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function callback () {
 	clog("Connected to DB");
-	User.find(function (err, users) {
-		for (var i=0,user; user=users[i]; i++) {
-			user.deleteAllRecs();	
-		}
-	});
-	getAllLocs();
+	// User.find(function (err, users) {
+	// 	for (var i=0,user; user=users[i]; i++) {
+	// 		user.deleteAllRecs();	
+	// 	}
+	// });
+	Location.fetch();
 	// newUser = new User({username: 'blazarus'})
 	// newUser.save();
 	// newUser = new User({username: 'havasi'});
@@ -77,11 +77,14 @@ var UserSchema = new Schema({
 		readAt: { type: Date, default: Date.now},
 		message: { type: Schema.Types.ObjectId, ref: 'Message', required: true }
 	}],
-	charms: [{
-		project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-		addedAt: { type: Date, default: Date.now },
-		addedWithMobile: { type: Boolean, required: true }
-	}]
+	// Cache of the person's charms
+	charms: [{ type: Schema.Types.ObjectId, ref: 'Project', required: true }]
+});
+
+var CharmActivitySchema = new Schema({
+	project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+	actionAt: { type: Date, default: Date.now },
+	action: { type: String, required: true, enum: ['add', 'delete'] }
 });
 
 var MessageSchema = new Schema({
@@ -354,7 +357,6 @@ UserSchema.pre('save', function (next) {
 	var seenCharms = {};
 
 	for (var i=0, elem; elem=this.charms[i]; i++) {
-		elem = elem.project;
 		if (elem in seenCharms) {
 			var err = new Error('This charm has already been added: ' + elem);
 			next(err);
@@ -380,7 +382,7 @@ LocationSchema.pre('save', function (next) {
 	next();
 });
 
-var getAllLocs = function () {
+LocationSchema.statics.fetch = function () {
 	url = "http://tagnet.media.mit.edu/rfid/api/rfid_info";
 	request.get(url, function (err, response, body) {
 		if (err)  return clog("Got error checking locations:", err);
@@ -426,6 +428,7 @@ var Location = mongoose.model('Location', LocationSchema);
 var Group = mongoose.model('Group', GroupSchema);
 var Project = mongoose.model('Project', ProjectSchema);
 var User = mongoose.model('User', UserSchema);
+var CharmActivity = mongoose.model('CharmActivity', CharmActivitySchema);
 var Message = mongoose.model('Message', MessageSchema);
 var Recommendation = mongoose.model('Recommendation', RecommendationSchema);
 
@@ -433,6 +436,7 @@ exports.Location = Location;
 exports.Group = Group;
 exports.Project = Project;
 exports.User = User;
+exports.CharmActivity = CharmActivity;
 exports.Message = Message;
 exports.Recommendation = Recommendation;
 

@@ -28,13 +28,14 @@ App.Routers.main = Backbone.Router.extend({
 		var _this = this;
 		// router doesn't automatically catch normal links
 		$(document).on("click", "a[href^='/']", function (e) {
+			// $("#loader").show();
 			var href = $(e.currentTarget).attr('href');
 			href = href.slice(1);
 
 			// don't screw with it if user opening a new tab or something
 			// or if it's not one of our routes
 			// For example, we want the page to reload for logout
-			if (href in _this.routes && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+			if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
 				e.preventDefault();
 
 				_this.navigate(href, { trigger: true });
@@ -115,11 +116,20 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	browseProjects: function () {
-		if (!App.projectBrowserRouter) {
-			App.projectBrowserRouter = new App.Routers.ProjectBrowser();
-			Backbone.history.stop();
-			Backbone.history.start();
+		var startProjBrowserRouter = function () {
+			if (!App.projectBrowserRouter) {
+				App.projectBrowserRouter = new App.Routers.ProjectBrowser();
+				Backbone.history.stop();
+				Backbone.history.start();
+			}
+		};
+
+		if (App.charms.fetched) {
+			startProjBrowserRouter();
+		} else {
+			App.EventDispatcher.listenToOnce(App.charms, 'fetched', startProjBrowserRouter);
 		}
+		
 
 		$("nav li").removeClass("active");
 		$("nav li#projectBrowser").addClass("active");
@@ -217,17 +227,17 @@ App.Routers.main = Backbone.Router.extend({
 	viewCharms: function () {
 		console.log("navigating to view charms");
 		$(".main-content").html($(window.App.Templates.viewCharms));
-		App.charms = new App.Collections.Charms();
-		App.charms.fetch({
-			success: function (collection, response, options) {
-				App.charmsView = new App.Views.Charms({ collection: collection });
+
+		App.charmsView = new App.Views.Charms({ collection: App.charms });
+		if (App.charms.fetched) {
+			App.charmsView.render();
+			$("#loader").hide();
+		} else {
+			App.EventDispatcher.listenToOnce(App.charms, 'fetched', function () {
 				App.charmsView.render();
 				$("#loader").hide();
-			},
-			error: function (collection, response, options) {
-				console.log("Error in fetch:", collection, response);
-			}
-		});
+			});
+		}
 
 		$("nav li").removeClass("active");
 		$("nav li#charms").addClass("active");
