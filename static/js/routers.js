@@ -90,9 +90,7 @@ App.Routers.main = Backbone.Router.extend({
 						App.allUsers.add(App.User);						
 						console.log("User logged in, continue. The user:", App.User);
 
-						App.EventDispatcher.trigger('login_success');
-
-						return func();
+						return $.when(App.onLoginSuccess()).then(func);
 					} else {
 						// User not logged in, redirect to login page
 						console.log("User not logged in, redirect to login page")
@@ -172,11 +170,9 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	postMessage: function () {
-		console.log("navigating to post message", window.App.Templates['postMessage']);
+		console.log("navigating to post message");
 		$("#loader").show();
-		$(".main-content").html($(window.App.Templates.postMessage));
-		App.postMsgView = new App.Views.PostMessageView({ collection: App.locations });
-		
+		App.postMsgView = new App.Views.PostMessage({ collection: App.locations });
 		App.postMsgView.render();
 		$("#loader").hide();
 
@@ -246,7 +242,7 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 
 	showDefault: function () {
 		$("#loader").show();
-		var screenid = "NONE";
+		var screenid = App.Models.Location.prototype.noneLocId;
 		if (!App.User.isStale()) {
 			screenid = App.User.get('location').get('screenid');
 		} 

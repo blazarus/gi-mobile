@@ -66,7 +66,7 @@ window.App = {
 	onLoginSuccess: function () {
 		console.log("Login successful. Event triggered, in onLogin");
 		// Called once user has been logged in
-		Backbone.history.stop();
+		$("#loader").show();
 		console.log("App.User:", App.User);
 		App.userInfoView = new App.Views.UserView({ model: App.User });
 
@@ -105,9 +105,9 @@ window.App = {
 			App.unreadMsgs.unshift(new App.Models.Message(data.msg, { parse: true }));
 		});
 
-		$.when(defferedMsgs, defferedCharms).then(
+		return $.when(defferedMsgs, defferedCharms).then(
 			function () {
-				Backbone.history.start();
+				console.log("Fetched collections");
 			}, function () {
 				console.log("Error fetching collections");
 				$("#loader").hide();

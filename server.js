@@ -87,6 +87,27 @@ app.get('/user/:username', function (req, res) {
 	});
 });
 
+app.get('/typeahead/users', function (req, res) {
+	clog("in typeahead", req.param('query'));
+	regexList = _.map(req.param('query').trim().split(" "), function (elem) {
+		return new RegExp(elem, "i");
+	});
+
+	User.find()
+		.or([{
+			username: { $in : regexList }
+		},{
+			firstname: { $in : regexList }
+		},{
+			lastname: { $in : regexList }
+		}])
+		.select('username')
+		.exec( function (err, users) {
+		clog("typeahead users", users);
+		res.json({ options: users });
+	});
+});
+
 app.post('/user/location/update', function (req, res) {
 	if (!req.session.user) {
 		clog("Must be logged in");
@@ -185,7 +206,7 @@ var validateUserList = function (usernames, success, failure) {
 	};
 	var failureCallback = function (username) {
 		// username: the invalid username
-		clog("Invalide user with username:", username);
+		clog("Invalid user with username:", username);
 		failure();
 		eventEmitter.removeListener('users not valid', failureCallback);
 	};
@@ -219,38 +240,53 @@ app.get('/checklogin', function (req, res) {
 	}
 });
 
-app.post('/messages/create', function (req, res) {
+app.post('/message', function (req, res) {
 	clog("Creating new message:", req.body);
-	
-	Location.findOne({ screenid: req.body.loc }, function (err, theLoc) {
-		if (err || !theLoc) {
+
+	var screenids = _.pluck(req.body.triggerLocs, 'screenid');
+	Location.find()
+		.where('screenid').in(screenids)
+		.exec(function (err, locs) {
+		
+		if (err || !locs) {
 			clog("Error finding this location");
-			return res.json({status: 'error'});
+			return res.send(500, 'Something went wrong')
 		}
 		var sender = req.session.user;
 		
-		var to = req.body['send-to'];
-		var usersToCheck = [to];
+		var to = req.body.to;
+		if (to.length === 0) {
+			clog("Error: No recipients");
+			return res.send(500, "No must have at least one recipient");
+		}
+		var usersToCheck = _.pluck(to, 'username');
 
 		validateUserList(usersToCheck, function (toList) {
 			// Users validated, now create the message
 			clog("List of validated user objects:", toList);
-			clog("Sender:", sender, new User({ username: 'blazarus' }));
-			var msg = new Message({
-				subject: req.body.subject,
-				body: req.body.body,
-				to: toList,
-				sender: sender._id,
-				triggerLocs: theLoc
-			});
-			msg.save(function (err, savedMsg) {
+			clog("triggerLocs:", locs);
+			Message.create(
+				{
+					subject: req.body.subject,
+					body: req.body.body,
+					to: toList,
+					sender: sender._id,
+					triggerLocs: locs
+				}, 
+				function (err, msg) {
 				if (err) {
 					clog("Error inserting message into DB:", err);
 					return res.send(500, 'Something went wrong:'+err);
 				}
-				clog("Successfully inserted msg into DB:", savedMsg);
-				eventEmitter.emit("newMsg", savedMsg);
-				res.json({ status: "ok" });
+				clog("Successfully inserted msg into DB:", msg);
+				eventEmitter.emit("newMsg", msg);
+				Message.findOne(msg)
+				.populate('triggerLocs', 'screenid')
+				.populate('to', 'username')
+				.populate('sender', 'username')
+				.exec(function (err, msg) {
+					res.json({ status: "ok", message: msg });				
+				});
 			});
 		}, function () {
 			// validating users failed, send error response
@@ -372,7 +408,7 @@ app.get('/locations/:screenid', function (req, res) {
 });
 
 var updateGroupsForLoc = function (location, successCallback, failureCallback) {
-	if (location.screenid == "NONE") {
+	if (location.screenid.toLowerCase() == "none") {
 		return updateAllGroups(location, successCallback);
 	}
 	location.groups = [];
@@ -817,31 +853,6 @@ var checkForMessage = function (socket, user) {
 		}
 	},
 	function (err) { });// do nothing
-
-	
-	// var readMsgIds = _.pluck(user.readMessages, 'message');
-	// clog("readMsgIds:", readMsgIds);
-	// Message
-	// 	.find({to: user._id})
-	// 	.or([{
-	// 		'triggerLocs': user.currloc
-	// 	},{
-	// 		'triggerLocs.screenid': "NONE" 
-	// 	}])
-	// 	.where('_id').nin(readMsgIds)
-	// 	.sort('-createdAt')
-	// 	.populate('to', 'username')
-	// 	.populate('sender', 'username')
-	// 	.populate('triggerLocs', 'screenid')
-	// 	.exec(function (err, msgs) {
-	// 		if (err) {
-	// 			return clog("Error while retrieving unread messages:", err);
-	// 		}
-	// 		clog("New messages ready to be delivered");
-	// 		for (var i=0,msg; msg=msgs[i]; i++) {
-	// 			socket.emit('msg', { msg: msg });			
-	// 		}
-	// 	});
 }
 
 eventEmitter.on("newMsg", function (msg) {

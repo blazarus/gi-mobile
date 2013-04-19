@@ -118,6 +118,11 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 		this.user = this.options.user;
 		this.listenTo(this.collection, 'add', this.newMessage);
 		this.listenTo(this.collection, 'add remove', this.render);
+
+		$(".modal .btn-primary").on('click',function (e) {
+			$(".modal").modal('hide');
+			App.router.navigate('/messages/view/unread', { trigger: true });
+		});
 	},
 
 	newMessage: function (msg) {
@@ -126,22 +131,6 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 		// and have two buttons - one saying go to message, which takes you to New messages tab
 		// the other saying Read later in New Messages tab
 		$(".modal").modal();
-	},
-
-	displayMsg: function (msg) {
-		var readMsgIds = _.pluck(App.User.get('readMessages'),'message');
-		if (!_.contains(readMsgIds, msg.get('_id'))) {
-			// This is a new message, display it then mark it read
-			// TODO check the location
-
-			var tplt = _.template(App.Templates.message)(msg.attributes);
-			var popup = $("<div>").addClass("alert newMsgPopup")
-				.append('<button type="button" class="close" data-dismiss="alert">&times;</button>')
-				.append($(tplt));
-			$("body").prepend(popup);
-			App.User.markMessageRead(msg);
-		}
-		
 	},
 
 	render: function () {
@@ -221,42 +210,161 @@ App.Views.Message = Backbone.View.extend({
 	}
 });
 
-App.Views.PostMessageView = Backbone.View.extend({
-	el: '#compose-message',
-
-	initialize: function () {
-		console.log("Initializing PostMessageView. collection:", this.collection);
-		var names = App.allUsers.pluck('username');
-		this.$("#send-to").typeahead({ source: names });
-	},
+App.Views.PostMessage = Backbone.View.extend({
+	el: '.main-content',
 
 	events: {
 		"submit": "submitMessage",
-		"click #clearform": "clearForm"
+		"click #resetform": "resetForm",
+		"click #recipients-list li": "removeRecipient",
+		"click #triggerlocs-list li": "removeLocation",
+		"change select": "addLoc",
+		"click :checkbox#toggle-allusers": "toggleAllRecipients",
+		"click :checkbox#toggle-alllocs": "toggleAllLocations",
+		"keyup input#subject": "updateSubject",
+		"keyup textarea": "updateBody"
+	},
+
+	initialize: function () {
+		console.log("Initializing PostMessageView. collection:", this.collection);
+
+		this.message = new App.Models.Message({
+			sender: App.User,
+			to: new App.Collections.Users(),
+			subject: "",
+			body: "",
+			triggerLocs: new App.Collections.Locations()
+		});
+
+		this.setupTypeahead();
+	},
+
+	setupTypeahead: function () {
+		var _this = this;
+
+		var searchUsers = _.debounce(function (query, process) {
+			return $.get('/typeahead/users', { query: query }, function (resp) {
+				var opts = _.pluck(resp.options, "username");
+				return process(opts);
+			});
+		}, 200);
+
+		$('#send-to').typeahead({
+			source: function (query, process) {
+				searchUsers(query, process);
+			},
+			matcher: function (item) {
+				// make sure any of my results returned from server are deemed ok
+				return true; 
+			},
+			updater: function (item) {
+				console.log("item:", item);
+				var newUser = App.allUsers.getOrCreate({username: item});
+				_this.message.get('to').add(newUser);
+				_this.render();
+				return item;
+			}
+		});
+	},
+
+	removeRecipient: function (e) {
+		var username = $(e.currentTarget).attr('id');
+		this.message.get('to').remove(username);
+		this.render();
+	},
+
+	addLoc: function (e) {
+		var screenid = $(e.target).val();
+		this.message.get('triggerLocs').add(App.locations.get(screenid));
+		this.render();
+	},
+
+	removeLocation: function (e) {
+		var screenid = $(e.currentTarget).attr('id');
+		this.message.get('triggerLocs').remove(screenid);
+		this.render();
+	},
+
+	toggleAllRecipients: function (e) {
+		var allUName = App.Models.User.prototype.specialUsernames.ALL;
+		var allUser = new App.Models.User({username: allUName});
+		if ($(e.currentTarget).is(":checked")) {
+			this.message.get('to').reset([allUser]);
+		} else {
+			this.message.get('to').reset([]);
+		}
+		this.render();
+	},
+
+	toggleAllLocations: function (e) {
+		if ($(e.currentTarget).is(":checked")) {
+			this.message.get('triggerLocs').reset([App.locations.getNoneLoc()]);
+		} else {
+			this.message.get('triggerLocs').reset([]);
+		}
+		this.render();
+	},
+
+	updateSubject: function (e) {
+		this.message.set('subject', $(e.currentTarget).val());
+	},
+
+	updateBody: function (e) {
+		this.message.set('body', $(e.currentTarget).val());
 	},
 
 	submitMessage: function (e) {
 		var _this = this;
 		e.preventDefault();
-		console.log("Submitting new message. Serialized form:", $("form").serialize(), this);
-		$.post('/messages/create', $("form").serialize(), function (resp) {
-			console.log("resp:", resp);
-			if (resp.status == "error") alert(resp.msg);
-			_this.$("input#send-to").select();
-		});
+		console.log("Submitting new message.");
+		var deffered = this.message.save();
+		if (!deffered) {
+			// error occured before sending to server
+			var msg = this.message.validationError || "Couldn't post message";
+			alert(msg);
+		} else {
+			$.when(deffered).then(function (response) {
+				_this.resetForm();
+			}, function (response) {
+				alert("There was a problem posting this message");
+			});
+		}
+
+
+
+		// $.post('/messages/create', $("form").serialize(), function (resp) {
+		// 	console.log("resp:", resp);
+		// 	if (resp.status == "error") alert(resp.msg);
+		// 	_this.$("input#send-to").select();
+		// }).error( function () {
+		// 	alert("Could not submit message. Not a valid username!");
+		// });
 	},
 
-	clearForm: function () {
-		this.$("input:text, textarea").val("");
-		this.$("input#send-to").focus();
+	resetForm: function (e) {
+		if (e) e.preventDefault();
+		this.message = new App.Models.Message({
+			sender: App.User,
+			to: new App.Collections.Users(),
+			subject: "",
+			body: "",
+			triggerLocs: new App.Collections.Locations()
+		});
+		this.render();
+	},
+
+	template: function (attrs) {
+		return _.template(App.Templates.postMessage)(attrs);
 	},
 
 	render: function () {
-		var container = $(document.createDocumentFragment()); 
-		for (var i=0, loc; loc=this.collection.models[i]; i++) {
-			container.append($("<option>").attr("value", loc.get('screenid')).text(loc.get('screenid')));
-		}
-		$("#compose-message #loc").append(container);
+		console.log("Rendering post message view");
+		var tplt = this.template({
+			message: this.message,
+			locations: this.collection
+		});
+		this.$el.html($(tplt));
+		this.setupTypeahead();
 		return this;
 	}
 });
@@ -281,8 +389,9 @@ App.Views.LoginView = Backbone.View.extend({
 			if (resp.status == "ok" && resp.user) {
 				App.User = new App.Models.LoggedInUser(resp.user);
 				App.allUsers.add(App.User);
-				App.EventDispatcher.trigger('login_success');
-				App.router.navigate("", { trigger: true });
+				$.when(App.onLoginSuccess()).then( function () {
+					App.router.navigate("", { trigger: true });
+				});
 			} else {
 				$("#loader").hide();
 				alert(resp.msg);
@@ -459,7 +568,7 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 
 	updateLoc: function () {
 		this.node = this.user.get('location');
-		if (this.node.get('screenid') == "NONE") {
+		if (this.node.isNoneLoc()) {
 			this.state = this.states.NOLOC;
 		} else {
 			this.state = this.states.LOC;

@@ -1,19 +1,48 @@
-<h2>Compose a Message</h2>
+<h2>Send a Message</h2>
 <form id="compose-message" name="newPost">
-	<label for="send-to">Send to:</label>
-	<input id="send-to" name="send-to" type="text" data-provide="typeahead" >
+	<label class="checkbox">
+		<input id="toggle-allusers" type="checkbox"<%= message.isForAllUsers() ? 'checked' : '' %>> Send to all users
+	</label>
+	<label for="send-to">Add a recipient</label>
+	<input id="send-to" name="send-to" type="text" data-provide="typeahead" <%= message.isForAllUsers() ? 'disabled' : '' %>>
+	<ul id="recipients-list">
+		<% message.get('to').each( function (user) { %> 
+			<% if (!user.isSpecialUser()) { %> 
+			<li class="btn btn-info" id="<%= user.get('username') %>">
+				<span><%= user.get('username') %></span>
+				<button type="button" class="close pull-right" >&times;</button>
+			</li>
+			<% } %>
+		<% }); %>
+	</ul>
 
+	<label class="checkbox">
+		<input type="checkbox" id="toggle-alllocs" <%= message.isForAllLocs() ? 'checked' : '' %> > Send to all locations
+	</label>
 	<label for="loc">Location:</label>
-	<select id="loc" name="loc">
-		
+	<select id="loc" name="loc" <%= message.isForAllLocs() ? 'disabled' : '' %>>
+		<option>--Select a location--</a>
+		<% locations.each( function (loc) { %> 
+			<option><%= loc.get('screenid') %></a>
+		<% }); %>
 	</select>
+	<ul id="triggerlocs-list">
+		<% message.get('triggerLocs').each( function (loc) { %> 
+			<% if (!loc.isNoneLoc()) { %> 
+			<li class="btn btn-info" id="<%= loc.id %>">
+				<span><%= loc.id %></span>
+				<button type="button" class="close pull-right" >&times;</button>
+			</li>
+			<% } %>
+		<% }); %>
+	</ul>
 
 	<!-- <label>Duration</label> -->
 	<label for="subject">Message Subject:</label>
-	<input id="subject" name="subject" type="text">
+	<input id="subject" name="subject" type="text" value="<%= message.get('subject') %>">
 
 	<label for="msg-body">Message Body:</label>
-	<textarea id="msg-body" name="body" type="textarea" rows="4" cols="50"></textarea>
+	<textarea id="msg-body" name="body" type="textarea" rows="4" cols="50" ><%= message.get('body') %></textarea>
 
-	<input type="submit" class="btn"><button id="clearform" class="btn">Clear</button>
+	<input type="submit" class="btn"><button id="resetform" class="btn">Reset Form</button>
 </form>

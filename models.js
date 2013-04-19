@@ -16,8 +16,12 @@ db.once('open', function callback () {
 	// 		user.deleteAllRecs();	
 	// 	}
 	// });
-	Location.fetch();
+	Location.fetchAll();
+	Location.createSpecial();
 	User.fetchAll(function () {}, function () {});
+	User.createSpecial(function () {}, function () {});
+
+
 	// newUser = new User({username: 'blazarus'})
 	// newUser.save();
 	// newUser = new User({username: 'havasi'});
@@ -73,8 +77,8 @@ var STALE = 3*60*60*1000; // 3 hours
 
 var UserSchema = new Schema({
 	username: { type: String, unique: true, required: true, trim: true },
-	firstname: { type: String, required: true, trim: true },
-	lastname: { type: String, required: true, trim: true },
+	firstname: { type: String, trim: true },
+	lastname: { type: String, trim: true },
 	pictureUrl: { type: String, trim: true },
 	currloc: { type: Schema.Types.ObjectId, ref: 'Location' },
 	lastseen: { type: Date },
@@ -116,6 +120,10 @@ UserSchema.virtual('type').get(function () {
 	return this.username.indexOf('@') >= 0 ? "sponsor" : "member";
 });
 
+UserSchema.virtual('fullname').get(function () {
+	return this.firstname + " " + this.lastname;
+});
+
 UserSchema.methods.isMember = function () {
 	return this.type == "member";
 };
@@ -140,26 +148,29 @@ UserSchema.methods.getUnreadMessages = function (success, failure) {
 	var _this = this;
 	var readMsgIds = _.pluck(this.readMessages, 'message');
 	clog("readMsgIds:", readMsgIds);
-	Location.findOne({screenid: "NONE"}, function (err, noneLoc) {
-		Message
-		.find({to: _this._id })
-		.or([{
-			triggerLocs: _this.isStale() ? null : _this.currloc
-		},{
-			triggerLocs: noneLoc
-		}])
-		.where('_id').nin(readMsgIds)
-		.sort('-createdAt')
-		.populate('triggerLocs', 'screenid')
-		.populate('to', 'username')
-		.populate('sender', 'username')
-		.exec(function (err, msgs) {
-			if (err) {
-				clog("Error while retrieving unread messages:", err);
-				return failure(err);
-			}
-			clog("New messages ready to be delivered:", msgs);
-			success(msgs);
+	Location.getNoneLoc( function (err, noneLoc) {
+		User.findOne({ username: "all" }, function (err, allUser) {
+			Message.find({
+				$and: [ //and the two or's
+					{ $or: [ { to: _this._id }, { to: allUser._id } ]},
+					{ $or: [ 
+						{ triggerLocs: _this.isStale() ? null : _this.currloc }, 
+						{ triggerLocs: noneLoc } 
+					]}
+				] })
+				.where('_id').nin(readMsgIds)
+				.sort('-createdAt')
+				.populate('triggerLocs', 'screenid')
+				.populate('to', 'username')
+				.populate('sender', 'username')
+				.exec(function (err, msgs) {
+					if (err) {
+						clog("Error while retrieving unread messages:", err);
+						return failure(err);
+					}
+					clog("New messages ready to be delivered:", msgs);
+					success(msgs);
+				});
 		});
 	});
 };
@@ -214,7 +225,7 @@ UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 							}, failure);
 						} else {
 							clog("Project already in DB:", project);
-							Recommendation.create(thisUser, project, match.weight, recUser, successCallback, failure);
+							Recommendation.create(thisUser, project, match.weight, "project", recUser, successCallback, failure);
 						}
 
 					});
@@ -229,7 +240,7 @@ UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 UserSchema.statics.getOrCreateRecommender = function (success, failure) {
 	// Creates the special 'recommendation' user 
 	// to be used as sender in recommendation message
-	var REC_USERNAME = "RECOMMENDER";
+	var REC_USERNAME = "recommender";
 	User.findOne({ username: REC_USERNAME }, function (err, user) {
 		if (err) {
 			clog("Error getting user from DB:", err);
@@ -319,13 +330,28 @@ UserSchema.statics.fetchAll = function (success, failure) {
 		}
 
 	});
+};
 
-
+UserSchema.statics.createSpecial = function (success, failure) {
+	clog("creating special users");
+	User.create({
+		username: "recommender"
+	},
+	{
+		username: "all"
+	}, function (err, recUser, allUser) {
+		if (err) {
+			clog("Error creating users:", err);
+			return failure(err);
+		}
+		clog("Successfully created special users:", recUser, allUser);
+		success([recUser, allUser]);
+	});
 };
 
 RecommendationSchema.methods.createMessage = function (recUser, project, success, failure) {
 	var _this = this;
-	Location.findOne({ screenid: "NONE" }, function (err, loc) {
+	Location.getNoneLoc(function (err, loc) {
 		clog("project passed to createMessage:", project);
 		var subject = "Project recommendation!";
 		var body = "Based on your interests, we think you should check out " + project.name;
@@ -457,6 +483,11 @@ UserSchema.pre('save', function (next) {
 	next();
 });
 
+UserSchema.pre('save', function (next) {
+	this.username = this.username.toLowerCase();
+	next();
+});
+
 LocationSchema.pre('save', function (next) {
 	var seen = {};
 
@@ -472,7 +503,18 @@ LocationSchema.pre('save', function (next) {
 	next();
 });
 
-LocationSchema.statics.fetch = function () {
+LocationSchema.pre('save', function (next) {
+	this.screenid = this.screenid.toLowerCase();
+	next();
+});
+
+LocationSchema.statics.getNoneLoc = function (callback) {
+	Location.findOne({ screenid: "none" }, function (err, loc) {
+		callback(err, loc);
+	});	
+};
+
+LocationSchema.statics.fetchAll = function () {
 	url = "http://tagnet.media.mit.edu/rfid/api/rfid_info";
 	request.get(url, function (err, response, body) {
 		if (err)  return clog("Got error checking locations:", err);
@@ -486,13 +528,13 @@ LocationSchema.statics.fetch = function () {
 				(function (loc) {
 					clog("Location:", loc.name);
 					Location.findOne({ screenid: loc.name }, function (err, location) {
-						if (err) return clog("Error trying to find location in DB:", err);
+						if (err) clog("Error trying to find location in DB:", err);
 						if (!location) {
 							// Need to create location
 							clog("Location was null, so add it..");
 							location = new Location({ screenid: loc.name });
 							location.save(function (err) {
-								if (err) return clog("Error trying to save loc in DB:", err);
+								if (err) clog("Error trying to save loc in DB:", err);
 								clog("Added new location to DB:", location);
 							});
 						} else {
@@ -505,14 +547,18 @@ LocationSchema.statics.fetch = function () {
 			}
 		}
 	});
+};
 
+LocationSchema.statics.createSpecial = function () {
+	clog("Creating special Locations");
 	// Add a special NONE location
-	location = new Location({ screenid: "NONE" });
-	location.save(function (err) {
+	Location.create({ screenid: "none" }, function (err, location) {
 		if (err) return clog("Error trying to save loc in DB:", err);
 		clog("Added new location to DB:", location);
 	});
 };
+
+
 
 var Location = mongoose.model('Location', LocationSchema);
 var Group = mongoose.model('Group', GroupSchema);

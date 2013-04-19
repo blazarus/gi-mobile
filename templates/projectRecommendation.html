@@ -1,6 +1,6 @@
 <div class="msg-header">
 	<h4 class="subject"><%= subject %></h4>
-	Location: <%= triggerLocs %>
+	Location: <%= triggerLocs.pluck('screenid') %>
 </div>
 <div class="msg-body well well-small">
 	<%= body %>

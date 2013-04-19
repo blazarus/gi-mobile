@@ -3,6 +3,8 @@
 App.Models.Message = Backbone.Model.extend({
 	idAttribute: "_id",
 
+	url: '/message',
+
 	initialize: function () {
 		// If the users' properties change, fire a change event
 		for (var i=0, user; user=this.get('to')[i]; i++) {
@@ -15,18 +17,43 @@ App.Models.Message = Backbone.Model.extend({
 		});
 	},
 
+	isForAllUsers: function () {
+		var allUName = App.Models.User.prototype.specialUsernames.ALL;
+		return !!this.get('to').get(allUName);
+	},
+
+	isForAllLocs: function () {
+		return this.get('triggerLocs').hasNoneLoc();
+	},
+
+	validate: function (attrs, options) {
+		if (!attrs.sender) return "Must have a sender";
+		if (!attrs.to.length) return "Must have at least one recipient";
+		if (!attrs.subject.trim()) return "Must have subject";
+		if (!attrs.body.trim()) return "Must have a message body";
+	},
+
 	parse: function (response) {
+		if ('message' in response) response = response.message;
+		else if ('msg' in response) response = response.msg;
+
 		response.sender = App.allUsers.getOrCreate(response.sender);
-		response.to = _.map(response.to, function (user) {
-			return App.allUsers.getOrCreate(user);
+		var toCollection = new App.Collections.Users();
+		_.each(response.to, function (elem) {
+			elem = App.allUsers.getOrCreate(elem);
+			toCollection.add(elem);
 		});
-		response.triggerLocs = _.map(response.triggerLocs, function (loc) {
-			var loc = App.locations.get(loc.screenid);
+		response.to = toCollection;
+
+		var locsCollection = new App.Collections.Locations();
+		_.each(response.triggerLocs, function (elem) {
+			var loc = App.locations.get((elem.screenid || elem.id));
 			if (!loc) {
-				throw new Error("Couldn't find loc: "+id);
+				throw new Error("Couldn't find loc: "+loc);
 			}
-			return loc;
+			locsCollection.add(loc);
 		});
+		response.triggerLocs = locsCollection;
 		response.createdAt = new Date(response.createdAt);
 		return response;
 	}
@@ -83,6 +110,18 @@ App.Models.User = Backbone.Model.extend({
 		stale: 3*60*60*1000 // 3 hours
 	},
 
+	specialUsernames: {
+		RECOMMENDER: "recommender",
+		ALL: "all"
+	},
+
+	isSpecialUser: function () {
+		for (prop in this.specialUsernames) {
+			if (this.id === this.specialUsernames[prop]) return true;
+		}
+		return false;
+	},
+
 	url: function () {
 		return '/user/' + this.id;
 	},
@@ -97,7 +136,7 @@ App.Models.User = Backbone.Model.extend({
 			clearInterval(this.intervalId);
 		});
 
-		var loc = App.locations.get("NONE");
+		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
 		if (!this.isRecommender()) {
 			// Recommender is a fake user in our system so won't have a location
@@ -122,7 +161,11 @@ App.Models.User = Backbone.Model.extend({
 
 	isRecommender: function () {
 		// Checks if this user is the special recommender user
-		return this.get('username').toLowerCase() === "recommender";
+		return this.get('username').toLowerCase() === this.specialUsernames.RECOMMENDER;
+	},
+
+	isAllUser: function () {
+		return this.get('username').toLowerCase() === this.specialUsernames.ALL;
 	},
 
 	checkLocation: function () {
@@ -169,7 +212,7 @@ App.Models.User = Backbone.Model.extend({
 
 	isStale: function () {
 		if (this.get('location') && this.get('tstamp') 
-			&& this.get('location').get('screenid') !== "NONE") {
+			&& !this.get('location').isNoneLoc()) {
 			var now = new Date();
 			var last = this.get('tstamp');
 			var diff = now.getTime() - last.getTime();
@@ -267,6 +310,8 @@ App.Collections.FollowingList = Backbone.Collection.extend({
 App.Models.Location = Backbone.Model.extend({
 	idAttribute: "screenid",
 
+	noneLocId: "none",
+
 	url: function () {
 		return '/locations/' + this.id;
 	},
@@ -278,6 +323,11 @@ App.Models.Location = Backbone.Model.extend({
 	toString: function () {
 		return this.get("screenid");
 	},
+
+	isNoneLoc: function () {
+		return this.id == this.noneLocId;
+	},
+
 	parse: function (response) {
 		if ('loc' in response) response = response.loc;
 		for (var i=0, group; group=response.groups[i]; i++) {
@@ -299,6 +349,14 @@ App.Collections.Locations = Backbone.Collection.extend({
 
 	parse: function (response) {
 		return response.locs;
+	},
+
+	getNoneLoc: function () {
+		return this.get(this.model.prototype.noneLocId);
+	},
+
+	hasNoneLoc: function () {
+		return !!this.get(this.model.prototype.noneLocId);
 	}
 
 
