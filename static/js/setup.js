@@ -21,7 +21,8 @@ window.App = {
 		"locateListElem": null,
 		"viewCharms": null,
 		"charmListElem": null,
-		"projectInfo": null
+		"projectInfo": null,
+		"projectRecommendation": null
 	},
 	User: null, // The logged in user (null when not logged in)
 	options: {
@@ -106,7 +107,7 @@ window.App = {
 					App.newMsgAlertView = new App.Views.NewMessageAlert({
 						collection: App.unreadMsgs,
 						user: App.User
-					});
+					}).render();
 				},
 				error: function (collection, response, options) {
 					console.log("Error in fetch:", collection, response);

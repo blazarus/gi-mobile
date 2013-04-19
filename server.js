@@ -34,7 +34,7 @@ app.post('/login', function (req, res) {
 
 	var success = function (user) {
 		req.session.user = user;
-		user.fetchRecommendations(function () {
+		user.fetchProjectRecommendations(function () {
 			clog("Successfully got recommendations");
 		}, function (err) {
 			clog("Error getting recommendations:", err);
@@ -144,7 +144,12 @@ var validateUsername = function (uname, success, failure) {
 				var jsono;
 				if (!err && (jsono = JSON.parse(body)) && jsono.profile && !jsono.error) {
 					// Valid user, so cache in DB
-					var newUser = new User({ username: uname });
+					var newUser = new User({ 
+						username: uname,
+						firstname: jsono.profile.first_name,
+						lastname: jsono.profile.last_name,
+						pictureUrl: jsono.profile.picture_url
+					});
 					newUser.save(function (err, savedUser) {
 						if (err) {
 							clog("Error saving ", uname, "in DB:", err);

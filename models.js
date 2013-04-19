@@ -17,6 +17,7 @@ db.once('open', function callback () {
 	// 	}
 	// });
 	Location.fetch();
+	User.fetchAll(function () {}, function () {});
 	// newUser = new User({username: 'blazarus'})
 	// newUser.save();
 	// newUser = new User({username: 'havasi'});
@@ -50,6 +51,7 @@ var Schema = mongoose.Schema;
 
 var LocationSchema = new Schema({
 	screenid: { type: String, unique: true, required: true, trim: true },
+	name: { type: String },
 	groups: [{ type: Schema.Types.ObjectId, ref: 'Group' }]
 });
 
@@ -67,10 +69,13 @@ var ProjectSchema = new Schema({
 
 // Number of milliseconds since last being seen 
 // to be considered a stale location
-var STALE = 3*60*60*1000 // 3 hours
+var STALE = 3*60*60*1000; // 3 hours
 
 var UserSchema = new Schema({
 	username: { type: String, unique: true, required: true, trim: true },
+	firstname: { type: String, required: true, trim: true },
+	lastname: { type: String, required: true, trim: true },
+	pictureUrl: { type: String, trim: true },
 	currloc: { type: Schema.Types.ObjectId, ref: 'Location' },
 	lastseen: { type: Date },
 	readMessages: [{
@@ -101,10 +106,23 @@ var RecommendationSchema = new Schema({
 	user: { type: Schema.Types.ObjectId, ref: 'User' },
 	message: { type: Schema.Types.ObjectId, ref: 'Message' },
 	project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-	weight: { type: Number, required: true }
+	weight: { type: Number, required: true },
+	type: { type: String, required: true, enum: ['project', 'people']}
 	// fulfilled: { type: Boolean, default: false },
 	// fulfilledAt: { type: Date }
 });
+
+UserSchema.virtual('type').get(function () {
+	return this.username.indexOf('@') >= 0 ? "sponsor" : "member";
+});
+
+UserSchema.methods.isMember = function () {
+	return this.type == "member";
+};
+
+UserSchema.methods.isSponsor = function () {
+	return this.type == "sponsor";
+};
 
 UserSchema.methods.isStale = function () {
 	clog("checking if user is stale");
@@ -146,11 +164,12 @@ UserSchema.methods.getUnreadMessages = function (success, failure) {
 	});
 };
 
-UserSchema.methods.fetchRecommendations = function (success, failure) {
+UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 	// Get recommendations from tagnet
 	var thisUser = this;
 	var limit = 20;
-	var url = "http://gi.media.mit.edu/luminoso2/match/projects?person=" + this.username + "&limit=" + limit;
+	var memberOrSponsor = this.isMember() ? "person" : "sponsor";
+	var url = "http://gi.media.mit.edu/luminoso2/match/projects?" + memberOrSponsor + "=" + this.username + "&limit=" + limit;
 	request.get(url, function (err, response, body) {
 		if (err) {
 			clog("Got error getting recommendations:", err);
@@ -161,9 +180,9 @@ UserSchema.methods.fetchRecommendations = function (success, failure) {
 		}
 
 		body = JSON.parse(body);
-		if (body.matches.length == 0 && body.error) {
-			clog("Got error from tagnet:", body.error);
-			return failure("Got error from tagnet: "+ body.error)
+		if (body.error) {
+			clog("Got error from luminoso:", body.error);
+			return failure("Got error from luminoso: "+ body.error)
 		}
 		clog("Recommendations:", body);
 
@@ -180,6 +199,7 @@ UserSchema.methods.fetchRecommendations = function (success, failure) {
 			for (var i=0,match; match=body.matches[i]; i++) {
 				(function (match) {
 					var pid = match.project;
+					clog("Looking for project in DB with pid:", pid);
 					Project.findOne({ pid: pid }, function (err, project) {
 						if (err) {
 							clog("Error finding project:", err);
@@ -190,7 +210,7 @@ UserSchema.methods.fetchRecommendations = function (success, failure) {
 							clog("Project was null, so add it..");
 							project = new Project({ pid: pid });
 							project.fetch(function () {
-								Recommendation.create(thisUser, project, match.weight, recUser, successCallback, failure);
+								Recommendation.create(thisUser, project, match.weight, "project", recUser, successCallback, failure);
 							}, failure);
 						} else {
 							clog("Project already in DB:", project);
@@ -235,6 +255,74 @@ UserSchema.statics.getOrCreateRecommender = function (success, failure) {
 	
 };
 
+UserSchema.statics.fetchAll = function (success, failure) {
+	// Get all media lab users with active status
+	var url = "http://data.media.mit.edu/people/json/?filter=(medialabstatus=TRUE)";
+	request.get(url, function (err, response, body) {
+		if (err || response.statusCode != "200") {
+			clog("Got error getting recommendations:", response.statusCode, err);
+			return failure(err);
+		}
+
+		try {
+			body = JSON.parse(body);
+		} catch (exception) {
+			clog("Error parsing response body:", exception);
+			return failure(exception);
+		}
+		
+		if (body.error) {
+			clog("Got error from data.media.mit.edu:", body.error);
+			return failure(body.error);
+		}
+
+		var count = 0, target = body.length;
+
+		var saved = function () {
+			if (++count >= target) {
+				clog("Saved all users");
+				return success();
+			}
+		}
+
+		for (var i=0, result; result=body[i]; i++) {
+			(function (result) {
+				var username = result.user_name;
+				var fname = result.first_name;
+				var lname = result.last_name;
+				var picUrl = result.picture_url;
+				User.findOne({ username: username }, function (err, user) {
+					if (err) {
+						clog("Error getting user from DB:", err);
+						return failure(err);
+					}
+					if (!user) {
+						// user is null so create it
+						user = new User({
+							username: username,
+							
+						});
+					}
+					user.firstname = fname;
+					user.lastname = lname;
+					user.pictureUrl = picUrl;
+					user.save(function (err) {
+						if (err) {
+							clog("Error saving user:", err);
+							return failure(err);
+						}
+						clog("Successfully saved user");
+						saved();
+					});
+				});
+			})(result);
+		}
+
+	});
+
+
+};
+
 RecommendationSchema.methods.createMessage = function (recUser, project, success, failure) {
 	var _this = this;
 	Location.findOne({ screenid: "NONE" }, function (err, loc) {
@@ -262,7 +350,7 @@ RecommendationSchema.methods.createMessage = function (recUser, project, success
 	});	
 };
 
-RecommendationSchema.statics.create = function (user, project, weight, recUser, success, failure) {
+RecommendationSchema.statics.create = function (user, project, weight, type, recUser, success, failure) {
 	Recommendation.findOne({ user: user._id, project: project._id}, function (err, rec) {
 		if (err) {
 			clog("Error finding recommendation in DB:", err);
@@ -274,7 +362,8 @@ RecommendationSchema.statics.create = function (user, project, weight, recUser, 
 			rec = new Recommendation({ 
 				user: user,
 			 	project: project,
-			 	weight: weight
+			 	weight: weight,
+			 	type: type
 			});
 			rec.createMessage(recUser, project, function () {
 				rec.save( function (err) {
@@ -304,6 +393,7 @@ UserSchema.methods.deleteAllRecs = function () {
 
 ProjectSchema.methods.fetch = function (success, failure) {
 	var _this = this;
+	clog("this project:", this);
 	var url = "http://tagnet.media.mit.edu/get_project_info?projectid=" + _this.pid;
 	clog("Checking tagnet for projects info,", url);
 	request.get(url, function (err, response, body) {

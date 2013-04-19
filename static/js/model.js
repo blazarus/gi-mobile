@@ -97,15 +97,19 @@ App.Models.User = Backbone.Model.extend({
 			clearInterval(this.intervalId);
 		});
 
-		var loc = new App.Models.Location({screenid: "NONE"});
+		var loc = App.locations.get("NONE");
 		this.set('location', loc);
-		var _this = this;
-		_this.checkLocation(_this);
-		// Check location every 500 ms
-		this.intervalId = setInterval(function () {
-			_this.checkLocation.call(_this);
-		}, 500);
-		console.log("intervalId:", this.intervalId);
+		if (!this.isRecommender()) {
+			// Recommender is a fake user in our system so won't have a location
+			var _this = this;
+			_this.checkLocation(_this);
+			// Check location every 500 ms
+			this.intervalId = setInterval(function () {
+				_this.checkLocation.call(_this);
+			}, 500);
+			console.log("intervalId:", this.intervalId);
+			
+		}
 	},
 
 	parse: function (resp) {
@@ -126,6 +130,9 @@ App.Models.User = Backbone.Model.extend({
 		if (!App.options.DUMMY_LOC) {
 			$.getJSON('http://gi-ego.media.mit.edu/' + _this.get("username") + '/events/1', function (resp) {
 
+				// If there are no events, there never have been,
+				// (should never go from having a location to never having been seen)
+				// so we don't need to do anything in that case
 				if (resp && resp.events.length > 0 && resp.events[0].readerid && resp.events[0].tstamp) {
 					var screenid = resp.events[0].readerid;
 					var loc = App.locations.get(screenid);
@@ -133,18 +140,6 @@ App.Models.User = Backbone.Model.extend({
 					tstmp = new Date(tstmp);
 					// Only update the model if there is a change
 					if (_this.get('location') != loc || _this.get('tstamp') - tstmp != 0) {
-						console.log("Updating location/tstamp", _this.get('username'), loc, _this.get('location'), tstmp, _this.get('tstamp'));
-						_this.set({
-							location: loc,
-							tstamp: tstmp
-						});
-
-					}
-				} else if (resp && resp.events.length === 0) {
-					var loc = null;
-					var tstmp = null;
-					// Only update the model if there is a change
-					if (_this.get('location') != loc || _this.get('tstamp') != tstmp) {
 						console.log("Updating location/tstamp", _this.get('username'), loc, _this.get('location'), tstmp, _this.get('tstamp'));
 						_this.set({
 							location: loc,
@@ -212,7 +207,7 @@ App.Models.LoggedInUser = App.Models.User.extend({
 	},
 
 	postUpdateLocation: function () {
-		var loc = this.get('location').get('screenid'), tstamp = this.get('tstamp');
+		var loc = this.get('location').id, tstamp = this.get('tstamp');
 		$.post('/user/location/update', 
 			{screenid: loc, tstamp: tstamp }, 
 			function (resp) {

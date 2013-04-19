@@ -43,7 +43,10 @@
 						<ul class="nav">
 							<li id="projectBrowser"><a href="/project-browser">Project Browser</a></li>
 							<li id="charms"><a href="/charms">View Charms</a></li>
-							<li id="unreadMessages"><a href="/messages/view/unread">New Messages</a></li>
+							<li id="unreadMessages">
+								<a href="/messages/view/unread">New Messages<span class="badge badge-info"></span></a>
+								
+							</li>
 							<li id="readMessages"><a href="/messages/view/read">Read Messages</a></li>
 							<li id="postMessages"><a href="/messages/post">Post Message</a></li>
 							<li id="locate"><a href="/locate">Locate</a></li>
@@ -69,11 +72,23 @@
 			</div>
 		</div>
 		<footer>
-
 			<hr>
 			<p>GI Mobile</p>
-
 		</footer>
+
+		<div class="modal hide fade">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+				<h3>Modal header</h3>
+			</div>
+				<div class="modal-body">
+				<p>One fine body…</p>
+			</div>
+			<div class="modal-footer">
+				<button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+				<button class="btn btn-primary">Save changes</button>
+			</div>
+		</div>
 
 		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 		<script>window.jQuery || document.write('<script src="/js/vendor/jquery-1.9.1.min.js"><\/script>')</script>

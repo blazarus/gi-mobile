@@ -112,7 +112,7 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	index: function () {
-		this.navigate("messages/view/read", { trigger: true });
+		this.navigate("messages/view/unread", { trigger: true });
 	},
 
 	browseProjects: function () {

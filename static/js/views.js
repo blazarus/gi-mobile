@@ -89,7 +89,7 @@ App.Views.MessageList = Backbone.View.extend({
 	el: "#messages-list",
 
 	initialize: function () {
-		this.listenTo(this.collection, 'add remove', this.render);
+		// this.listenTo(this.collection, 'add remove', this.render);
 
 		this.messageView = this.options.messageView || App.Views.Message;
 	},
@@ -117,7 +117,7 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 	initialize: function (options) {
 		this.user = this.options.user;
 		this.listenTo(this.collection, 'add', this.newMessage);
-		this.listenTo(this.user, 'change:location', this.checkMsg);
+		this.listenTo(this.collection, 'add remove', this.render);
 	},
 
 	newMessage: function (msg) {
@@ -125,10 +125,7 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 		// Open a modal dialog saying You have a new message (or recommendation)
 		// and have two buttons - one saying go to message, which takes you to New messages tab
 		// the other saying Read later in New Messages tab
-	},
-
-	checkMsg: function () {
-
+		$(".modal").modal();
 	},
 
 	displayMsg: function (msg) {
@@ -145,6 +142,14 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 			App.User.markMessageRead(msg);
 		}
 		
+	},
+
+	render: function () {
+		// Update badge in nav
+		var l = this.collection.length;
+		// bootstrap makes it disappear when no text
+		$(".nav .badge").text(l > 0 ? l : "");
+		return this;
 	}
 });
 
@@ -159,8 +164,11 @@ App.Views.NewMessage = Backbone.View.extend({
 		this.listenTo(this.model, 'change', this.render);
 	},
 
-	template: function () {
-		return _.template(window.App.Templates.message);
+	template: function (attrs) {
+		if (this.model.get('sender').isRecommender()) {
+			return _.template(App.Templates.projectRecommendation)(attrs);
+		}
+		return _.template(App.Templates.message)(attrs);
 	},
 
 	closeMessage: function () {
@@ -169,10 +177,10 @@ App.Views.NewMessage = Backbone.View.extend({
 	},
 
 	render: function () {
-		var tplt = this.template()(this.model.attributes);
+		var tplt = this.template(this.model.attributes);
 
 		var closeBtn = $("<button type='button'>")
-				.addClass('btn pull-right closebtn')
+				.addClass('btn btn-primary pull-right closebtn')
 				.text("Ok, got it! Mark as read.");
 
 		this.$el.html(tplt).prepend(closeBtn);
@@ -230,6 +238,8 @@ App.Views.PostMessageView = Backbone.View.extend({
 		// 	}
 		// 	$("#compose-message #loc").append(container);
 		// });
+		var names = App.allUsers.pluck('username');
+		this.$("#send-to").typeahead({ source: names });
 	},
 
 	events: {
@@ -259,6 +269,7 @@ App.Views.PostMessageView = Backbone.View.extend({
 			container.append($("<option>").attr("value", loc.get('screenid')).text(loc.get('screenid')));
 		}
 		$("#compose-message #loc").append(container);
+		return this;
 	}
 });
 
