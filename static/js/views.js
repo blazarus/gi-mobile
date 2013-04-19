@@ -226,18 +226,6 @@ App.Views.PostMessageView = Backbone.View.extend({
 
 	initialize: function () {
 		console.log("Initializing PostMessageView. collection:", this.collection);
-
-		// Render once collection has been fetched
-		this.listenToOnce(this.collection, 'fetched', this.render);
-		if (this.collection.fetched) this.render();
-		// $.getJSON('/locations/all', function (resp) {
-		// 	console.log("Response from all locations:", resp);
-		// 	var container = $(document.createDocumentFragment()); 
-		// 	for (var i=0, loc; loc=resp[i]; i++) {
-		// 		container.append($("<option>").attr("value", loc).text(loc));
-		// 	}
-		// 	$("#compose-message #loc").append(container);
-		// });
 		var names = App.allUsers.pluck('username');
 		this.$("#send-to").typeahead({ source: names });
 	},

@@ -116,20 +116,11 @@ App.Routers.main = Backbone.Router.extend({
 	},
 
 	browseProjects: function () {
-		var startProjBrowserRouter = function () {
-			if (!App.projectBrowserRouter) {
-				App.projectBrowserRouter = new App.Routers.ProjectBrowser();
-				Backbone.history.stop();
-				Backbone.history.start();
-			}
-		};
-
-		if (App.charms.fetched) {
-			startProjBrowserRouter();
-		} else {
-			App.EventDispatcher.listenToOnce(App.charms, 'fetched', startProjBrowserRouter);
-		}
-		
+		if (!App.projectBrowserRouter) {
+			App.projectBrowserRouter = new App.Routers.ProjectBrowser();
+			Backbone.history.stop();
+			Backbone.history.start();
+		}		
 
 		$("nav li").removeClass("active");
 		$("nav li#projectBrowser").addClass("active");
@@ -143,24 +134,11 @@ App.Routers.main = Backbone.Router.extend({
 		$("nav li").removeClass("active");
 		$("nav li#unreadMessages").addClass("active");
 
-		// If unreadMsgs already loaded, create view immediately,
-		// otherwise wait for them to be loaded
-		if (App.unreadMsgs.loaded) {
-			App.newMsgListView = new App.Views.MessageList({
-				collection: App.unreadMsgs,
-				messageView: App.Views.NewMessage
-			}).render();
-			$("#loader").hide();
-		} else {
-			App.EventDispatcher.on('newMsgsLoaded', function () {
-				App.newMsgListView = new App.Views.MessageList({
-					collection: App.unreadMsgs,
-					messageView: App.Views.NewMessage
-				}).render();
-				$("#loader").hide();
-			});
-		}
-		
+		App.newMsgListView = new App.Views.MessageList({
+			collection: App.unreadMsgs,
+			messageView: App.Views.NewMessage
+		}).render();
+		$("#loader").hide();		
 	},
 
 	readMessages: function () {
@@ -199,13 +177,8 @@ App.Routers.main = Backbone.Router.extend({
 		$(".main-content").html($(window.App.Templates.postMessage));
 		App.postMsgView = new App.Views.PostMessageView({ collection: App.locations });
 		
-		var onLoaded = function () {
-			App.postMsgView.render();
-			$("#loader").hide();
-		};
-		if (App.locations.fetched) onLoaded();
-		else App.postMsgView.listenToOnce(App.locations, 'fetched', onLoaded);
-
+		App.postMsgView.render();
+		$("#loader").hide();
 
 		$("nav li").removeClass("active");
 		$("nav li#postMessages").addClass("active");
@@ -229,15 +202,8 @@ App.Routers.main = Backbone.Router.extend({
 		$(".main-content").html($(window.App.Templates.viewCharms));
 
 		App.charmsView = new App.Views.Charms({ collection: App.charms });
-		if (App.charms.fetched) {
-			App.charmsView.render();
-			$("#loader").hide();
-		} else {
-			App.EventDispatcher.listenToOnce(App.charms, 'fetched', function () {
-				App.charmsView.render();
-				$("#loader").hide();
-			});
-		}
+		App.charmsView.render();
+		$("#loader").hide();
 
 		$("nav li").removeClass("active");
 		$("nav li#charms").addClass("active");

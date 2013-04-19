@@ -32,103 +32,61 @@ window.App = {
 		$("loader").show();
 		App.EventDispatcher = _.clone(Backbone.Events);
 		App.EventDispatcher.on('login_success', App.onLoginSuccess);
-		App.EventDispatcher.on('templates_loaded', function () {
-			if (App.locations.fetched) {
-				App.startRouter();
-			} else {
-				App.EventDispatcher.listenToOnce(App.locations, 'fetched', App.startRouter);
-			}
-		});
-
-		App.allUsers = new App.Collections.Users();
-		App.loadTemplates();
 
 		App.locations = new App.Collections.Locations();
-		App.locations.fetch({
-			success: function (collection, response, options) {
-				console.log("Fetched locations:", collection, response);
-				App.locations.fetched = true;
-				App.locations.trigger('fetched');
-			},
-			error: function (collection, response, options) {
-				console.log("Error in fetch:", collection, response);
-				throw new Error("Error fetching locations");
-			}
+		var locsDeffered = App.locations.fetch();
+		App.allUsers = new App.Collections.Users();
+		$.when(App.loadTemplates(), locsDeffered).then( function () {
+			console.log("Loaded both templates and locations");
+			App.router = new App.Routers.main();
+			Backbone.history.start({pushState: true});
 		});
+
+		
 	},
 	loadTemplates: function () {
 		console.log("Attempting to load templates");
 		var startTime = new Date();
-		var count = 0;
-		var target = Object.keys(App.Templates).length;
-
-		for (tmpl in window.App.Templates) {
-			(function (tmpl) {
-				// Expects templates to be accessible from /templates/<tmpl>
-				$.get('/templates/' + tmpl + '.html', function (data) {
-					window.App.Templates[tmpl] = data;
-					if (++count >= target) {
-						// All templates have been loaded, fire event
-						var endTime = new Date();
-						console.log("Loading templates took:", (endTime-startTime)+"ms");
-						App.EventDispatcher.trigger('templates_loaded');
-					}
-					console.log("How many templates have been loaded?", count, "out of", target);
-				});
-			})(tmpl); // Pass tmpl in here to seal in value when callback is run
+		var ajaxList = [];
+		for (tmpl in App.Templates) {
+			var jqXHR = $.get('/templates/' + tmpl + '.html');
+			ajaxList.push(jqXHR);
 		}
-	},
-	startRouter: function () {
-		console.log("All templates and locations have been loaded successfully");
-		App.router = new App.Routers.main();
-		Backbone.history.start({pushState: true});
-	},
+		// return the deffered object
+		return $.when.apply($, ajaxList).then( function () {
 
+			for (var i=0,key; key=Object.keys(App.Templates)[i]; i++) {
+				App.Templates[key] = arguments[i][0];
+			}
+			var endTime = new Date();
+			console.log("Loading templates took:", (endTime-startTime)+"ms");
+		});
+	},
 
 	onLoginSuccess: function () {
 		console.log("Login successful. Event triggered, in onLogin");
 		// Called once user has been logged in
-
+		Backbone.history.stop();
 		console.log("App.User:", App.User);
 		App.userInfoView = new App.Views.UserView({ model: App.User });
 
-		
 		App.followingUsers = new App.Collections.FollowingList();
-
 		App.unreadMsgs = new App.Collections.UnreadMessages();
-		// App.newMsgView = new App.Views.NewMsg({ collection: App.unreadMsgs });
-		
-		var fetchUnreadMsgs = function () {
-			App.unreadMsgs.fetch({
-				success: function (collection, response, options) {
-					console.log("Unread messages:", App.unreadMsgs);
-					App.EventDispatcher.trigger('newMsgsLoaded');
-					App.unreadMsgs.loaded = true;
-					App.newMsgAlertView = new App.Views.NewMessageAlert({
-						collection: App.unreadMsgs,
-						user: App.User
-					}).render();
-				},
-				error: function (collection, response, options) {
-					console.log("Error in fetch:", collection, response);
-				}
-			});
-		};
-		if (App.locations.fetched) {
-			fetchUnreadMsgs();
-		} else {
-			App.EventDispatcher.listenToOnce(App.locations, 'fetched', fetchUnreadMsgs);
-		}
 		App.charms = new App.Collections.Charms({ user: App.User });
-		App.charms.fetch({
+
+		var defferedMsgs = App.unreadMsgs.fetch({
+			success: function (collection, response, options) {
+				console.log("Unread messages:", App.unreadMsgs);
+				App.newMsgAlertView = new App.Views.NewMessageAlert({
+					collection: App.unreadMsgs,
+					user: App.User
+				}).render();
+			}
+		});
+
+		var defferedCharms = App.charms.fetch({
 			success: function (collection, response, options) {
 				console.log("Charms fetched:", App.charms);
-				App.charms.trigger('fetched');
-				App.charms.fetched = true;
-				$("#loader").hide();
-			},
-			error: function (collection, response, options) {
-				console.log("Error in fetch:", collection, response);
 			}
 		});
 
@@ -146,5 +104,15 @@ window.App = {
 			App.socket.emit('ack', { status: 'received' });
 			App.unreadMsgs.unshift(new App.Models.Message(data.msg, { parse: true }));
 		});
+
+		$.when(defferedMsgs, defferedCharms).then(
+			function () {
+				Backbone.history.start();
+			}, function () {
+				console.log("Error fetching collections");
+				$("#loader").hide();
+				alert("Sorry, something went wrong.");
+			});
+		
 	}
 };
