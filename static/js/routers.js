@@ -174,6 +174,7 @@ App.Routers.main = Backbone.Router.extend({
 		$("#loader").show();
 		App.postMsgView = new App.Views.PostMessage({ collection: App.locations });
 		$(".main-content").html(App.postMsgView.render().$el);
+		App.postMsgView.setupTypeahead(); //Need to call this after elements have been added to the page
 		$("#loader").hide();
 
 		$("nav li").removeClass("active");

@@ -91,6 +91,7 @@ window.App = {
 		});
 
 		// Set up socket.io
+		// hack to get around worrying about the proxy on production
 		var socketUrl = window.location.hostname === "gimobile.media.mit.edu" ? "http://ochre.media.mit.edu:8080" : "/";
 		App.socket = io.connect(socketUrl);
 

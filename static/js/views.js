@@ -336,15 +336,6 @@ App.Views.PostMessage = Backbone.View.extend({
 			});
 		}
 
-
-
-		// $.post('/messages/create', $("form").serialize(), function (resp) {
-		// 	console.log("resp:", resp);
-		// 	if (resp.status == "error") alert(resp.msg);
-		// 	_this.$("input#send-to").select();
-		// }).error( function () {
-		// 	alert("Could not submit message. Not a valid username!");
-		// });
 	},
 
 	resetForm: function (e) {
