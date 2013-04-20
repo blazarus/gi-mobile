@@ -91,8 +91,8 @@ window.App = {
 		});
 
 		// Set up socket.io
-		console.log(window.location.hostname + '/')
-		App.socket = io.connect(location.protocol + "://" + location.hostname + "/");
+		var socketUrl = window.location.hostname === "gimobile.media.mit.edu" ? "http://ochre.media.mit.edu:8080" : "/";
+		App.socket = io.connect(socketUrl);
 
 		App.socket.on('ask_username', function (data) {
 			console.log("Socket.io asking for logged in username:", App.User.get('username'));
