@@ -91,7 +91,8 @@ window.App = {
 		});
 
 		// Set up socket.io
-		App.socket = io.connect('/');
+		console.log(window.location.hostname + '/')
+		App.socket = io.connect(location.protocol + "://" + location.hostname + "/");
 
 		App.socket.on('ask_username', function (data) {
 			console.log("Socket.io asking for logged in username:", App.User.get('username'));
