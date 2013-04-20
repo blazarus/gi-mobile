@@ -21,7 +21,6 @@ db.once('open', function callback () {
 	User.fetchAll(function () {}, function () {});
 	User.createSpecial(function () {}, function () {});
 
-
 	// newUser = new User({username: 'blazarus'})
 	// newUser.save();
 	// newUser = new User({username: 'havasi'});
@@ -55,20 +54,22 @@ var Schema = mongoose.Schema;
 
 var LocationSchema = new Schema({
 	screenid: { type: String, unique: true, required: true, trim: true },
-	name: { type: String },
+	name: { type: String, required: true },
 	groups: [{ type: Schema.Types.ObjectId, ref: 'Group' }]
 });
 
 var GroupSchema = new Schema({
 	groupid: { type: Number, required: true, unique: true },
 	name: { type: String, required: true, trim: true },
+	location: { type: Schema.Types.ObjectId, ref: 'Location', required: true },
 	projects: [{ type: Schema.Types.ObjectId, ref: 'Project' }]
 });
 
 var ProjectSchema = new Schema({
 	pid: { type: Number, required: true, unique: true },
 	name: { type: String, required: true, trim: true },
-	description: { type: String, trim: true }
+	description: { type: String, trim: true },
+	location: { type: Schema.Types.ObjectId, ref: 'Location', required: true }
 });
 
 // Number of milliseconds since last being seen 
@@ -178,7 +179,7 @@ UserSchema.methods.getUnreadMessages = function (success, failure) {
 UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 	// Get recommendations from tagnet
 	var thisUser = this;
-	var limit = 20;
+	var limit = 50;
 	var memberOrSponsor = this.isMember() ? "person" : "sponsor";
 	var url = "http://gi.media.mit.edu/luminoso2/match/projects?" + memberOrSponsor + "=" + this.username + "&limit=" + limit;
 	request.get(url, function (err, response, body) {
@@ -206,6 +207,13 @@ UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 			}
 		};
 
+		var numRecsShowImmediately = 5;
+		var thresh = _.chain(body.matches)
+			.sortBy('weight')
+			.reverse()
+			.pluck('weight')
+			.value()[numRecsShowImmediately];
+
 		User.getOrCreateRecommender(function (recUser) {
 			for (var i=0,match; match=body.matches[i]; i++) {
 				(function (match) {
@@ -221,11 +229,15 @@ UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 							clog("Project was null, so add it..");
 							project = new Project({ pid: pid });
 							project.fetch(function () {
-								Recommendation.create(thisUser, project, match.weight, "project", recUser, successCallback, failure);
-							}, failure);
+								Recommendation.create(thisUser, project, match.weight, "project", recUser, thresh, successCallback, failure);
+							}, function (err) {
+								// Not for a valid project 
+								// (probably no screen associated with it's location)
+								return count++;
+							});
 						} else {
 							clog("Project already in DB:", project);
-							Recommendation.create(thisUser, project, match.weight, "project", recUser, successCallback, failure);
+							Recommendation.create(thisUser, project, match.weight, "project", recUser, thresh, successCallback, failure);
 						}
 
 					});
@@ -356,27 +368,53 @@ RecommendationSchema.methods.createMessage = function (recUser, project, success
 		var subject = "Project recommendation!";
 		var body = "Based on your interests, we think you should check out " + project.name;
 		if (!this.message) {
-			var message = new Message({
+			Message.create({
 				sender: recUser,
 				to: [_this.user],
 				subject: subject,
 				body: body,
 				triggerLocs: loc
-			});
-			clog("The recommendation message before saving:", message);
-			message.save(function (err) {
+			}, function (err, message) {
 				if (err) {
 					clog("Error saving recommendation message:", err);
 					return failure("Error saving recommendation message: "+ err);
 				}
+				clog("The recommendation message successfully saved:", message);
 				_this.message = message;
-				success(_this);
+				success(message);
 			});
 		}
 	});	
 };
 
-RecommendationSchema.statics.create = function (user, project, weight, type, recUser, success, failure) {
+RecommendationSchema.methods.createLocationMessage = function (recUser, project, success, failure) {
+	var _this = this;
+	clog("Creating a recommendation message for specific location:", project.location);
+	Project.findOne({_id: project._id}).populate('location').exec(function (err, project) {
+		clog("project passed to createMessage:", project);
+		var subject = "Project recommendation!";
+		var body = "Based on your interests, we think you should check out " + project.name + ", located at " + project.location.name;
+		if (!this.message) {
+			Message.create({
+				sender: recUser,
+				to: [_this.user],
+				subject: subject,
+				body: body,
+				triggerLocs: project.location
+			}, function (err, message) {
+				if (err) {
+					clog("Error saving recommendation message:", err);
+					return failure("Error saving recommendation message: "+ err);
+				}
+				clog("The recommendation message successfully saved:", message);
+				_this.message = message;
+				success(message);
+			});
+		}
+	});
+};
+
+RecommendationSchema.statics.create = function (user, project, weight, type, recUser, thresh, success, failure) {
 	Recommendation.findOne({ user: user._id, project: project._id}, function (err, rec) {
 		if (err) {
 			clog("Error finding recommendation in DB:", err);
@@ -391,7 +429,7 @@ RecommendationSchema.statics.create = function (user, project, weight, type, rec
 			 	weight: weight,
 			 	type: type
 			});
-			rec.createMessage(recUser, project, function () {
+			var successCB = function (message) {
 				rec.save( function (err) {
 					if (err) {
 						clog("Error saving new recommendation:", err);
@@ -399,7 +437,14 @@ RecommendationSchema.statics.create = function (user, project, weight, type, rec
 					}
 					success(rec);
 				});
-			}, failure);
+			}
+			if (weight > thresh) {
+				// Create message that will be shown immediately
+				rec.createMessage(recUser, project, successCB, failure);
+			} else {
+				// Create message that will be shown at location of project
+				rec.createLocationMessage(recUser, project, successCB, failure);
+			}
 		}
 		success(rec);
 	});
@@ -442,15 +487,23 @@ ProjectSchema.methods.fetch = function (success, failure) {
 		_this.description = body.longdescription;
 		_this.name = body.projectname;
 
-		_this.save( function (err) {
-			if (err) {
-				clog("Error saving Project:", err, _this);
-				return failure("Error saving Project: " + err);
-			}
-			clog("Successfully updated project info", _this);
-			success(_this);
-		});
-
+		Location.findOne()
+			.or([{ name: body.location }, { screenid: body.location }])
+			.exec( function (err, location) {
+				if (err || !location) {
+					clog("Error finding a location with name or screenid:", body.location, err);
+					return failure("Error finding a location with name or screenid:" + err);
+				}
+				_this.location = location;
+				_this.save(function (err) {
+					if (err) {
+						clog("Error saving Project:", err, _this);
+						return failure("Error saving Project: " + err);
+					}
+					clog("Successfully updated project info", _this);
+					success(_this);
+				});
+			});
 	});
 };
 
@@ -533,10 +586,7 @@ LocationSchema.statics.fetchAll = function () {
 							// Need to create location
 							clog("Location was null, so add it..");
 							location = new Location({ screenid: loc.name });
-							location.save(function (err) {
-								if (err) clog("Error trying to save loc in DB:", err);
-								clog("Added new location to DB:", location);
-							});
+							location.fetch(function () {}, function () {});
 						} else {
 							// Project saved, but need to add it to location
 							clog("Location already in DB:", location);
@@ -549,10 +599,37 @@ LocationSchema.statics.fetchAll = function () {
 	});
 };
 
+LocationSchema.methods.fetch = function (success, failure) {
+	var url = "http://data.media.mit.edu/pldb/locations/json/?screenID=" + this.screenid;
+	var _this = this;
+	request.get(url, function (err, response, body) {
+		if (err)  return clog("Got error checking locations:", err);
+		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
+
+		try {
+			body = JSON.parse(body)[0];
+		} catch (exception) {
+			return clog("Error parsing json", exception);
+		}
+
+		if (body.name) _this.name = body.name;
+		else _this.name = _this.screenid;
+		_this.save(function (err) {
+			if (err) {
+				clog("Error saving location", _this.screenid, err);
+				return failure("Error saving location: " + err);
+			}
+			clog("Successfully fetched and saved location");
+			return success();
+		})
+	});
+
+};
+
 LocationSchema.statics.createSpecial = function () {
 	clog("Creating special Locations");
 	// Add a special NONE location
-	Location.create({ screenid: "none" }, function (err, location) {
+	Location.create({ screenid: "none", name: "Root" }, function (err, location) {
 		if (err) return clog("Error trying to save loc in DB:", err);
 		clog("Added new location to DB:", location);
 	});

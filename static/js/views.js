@@ -86,10 +86,10 @@ App.Views.UnreadMessages = Backbone.View.extend({
 });
 
 App.Views.MessageList = Backbone.View.extend({
-	el: "#messages-list",
+	el: ".message-list",
 
 	initialize: function () {
-		// this.listenTo(this.collection, 'add remove', this.render);
+		this.listenTo(this.collection, 'add remove', this.render);
 
 		this.messageView = this.options.messageView || App.Views.Message;
 	},
@@ -145,6 +145,8 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 App.Views.NewMessage = Backbone.View.extend({
 	tagName: "li",
 
+	className: "message",
+
 	events: {
 		"click .closebtn": "closeMessage"
 	},
@@ -187,6 +189,8 @@ App.Views.NewMessage = Backbone.View.extend({
 App.Views.Message = Backbone.View.extend({
 	tagName:  "li",
 
+	className: "message",
+
 	initialize: function () {
 		this.listenTo(this.model, 'change', this.render);
 	},
@@ -211,7 +215,9 @@ App.Views.Message = Backbone.View.extend({
 });
 
 App.Views.PostMessage = Backbone.View.extend({
-	el: '.main-content',
+	tagName: 'div',
+
+	id: "post-message",
 
 	events: {
 		"submit": "submitMessage",
@@ -443,6 +449,8 @@ App.Views.UserView = Backbone.View.extend({
 App.Views.LocateListElemView = Backbone.View.extend({
 	tagName: "li",
 
+	className: "message",
+
 	events: {
 		"click .remove": "removeUser"
 	},
@@ -497,10 +505,21 @@ App.Views.LocateUserView = Backbone.View.extend({
 		e.preventDefault();
 		var uname = this.$("#add-user input#username").val();
 		console.log("Trying to add user:", uname);
-		var user = App.allUsers.getOrCreate({username: uname});
+		var _this = this;
+		var user = App.allUsers.create({username: uname}, {
+			wait: true,
+			success: function (model, xhr, options) {
+				console.log("Successfully added model");
+				_this.collection.add(user);
+				console.log("followingUsers:", App.followingUsers);
+			},
+			error: function (model, xhr, options) {
+				model.destroy();
+				alert("Could not validate this username");
+			}
+		});
 		console.log("user:", user);
-		this.collection.add(user);
-		console.log("followingUsers:", App.followingUsers);
+		
 		this.$("#add-user input#username").val("").focus();
 		return this;
 	},

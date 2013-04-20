@@ -138,7 +138,7 @@ App.Models.User = Backbone.Model.extend({
 
 		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
-		if (!this.isRecommender()) {
+		if (!this.isSpecialUser()) {
 			// Recommender is a fake user in our system so won't have a location
 			var _this = this;
 			_this.checkLocation(_this);
@@ -289,8 +289,16 @@ App.Collections.Users = Backbone.Collection.extend({
 		if (existingModel) {
 			return existingModel;
 		}
-		var model = new this.model(attrs);
-		this.add(model);
+
+		var model = this.create(attrs, {
+			success: function (model, xhr, options) {
+				console.log("Successfully added model");
+			},
+			error: function (model, xhr, options) {
+				model.destroy();
+				alert("Could not validate this username");
+			}
+		});
 
 		return model;		
 	}

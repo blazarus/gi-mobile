@@ -38,25 +38,9 @@ h1, h2 {
 	position: fixed;
 }
 
-#messages-list {
+.message-list {
 	list-style: none;
-	li {
-		@shadow: 9px 8px 10px 0px #ccc;
-		// border-top: 1px solid rgb(230, 230, 230);
-		padding: 10px;
-		border: 1px solid #e6e6e6;
-		margin: 12px auto;
-		-moz-box-shadow: @shadow;
-		-webkit-box-shadow: @shadow;
-		box-shadow: @shadow;
-
-		.msg-header {
-
-		}
-		.msg-body {
-
-		}
-	}
+	
 	// li:hover {
 	// 		opacity: 0;
 
@@ -64,9 +48,34 @@ h1, h2 {
 	// 	}
 }
 
+li.message {
+	@shadow: 9px 8px 10px 0px #ccc;
+	// border-top: 1px solid rgb(230, 230, 230);
+	padding: 10px;
+	border: 1px solid #e6e6e6;
+	margin: 12px auto;
+	-moz-box-shadow: @shadow;
+	-webkit-box-shadow: @shadow;
+	box-shadow: @shadow;
+
+	.msg-header {
+
+	}
+	.msg-body {
+
+	}
+}
+
+
+
 .main-content {
 	#locate {
-		text-align: center;
+		form#add-user {
+			text-align: center;
+		}
+		img {
+			margin-right: 20px;
+		}
 		input[type="submit"] {
 			vertical-align: top;
 		}
@@ -77,11 +86,31 @@ h1, h2 {
 }
 
 #compose-message {
+	margin: auto;
+	width: 290px;
+	border: 1px solid #ddd;
+	padding: 15px;
+	border-radius: 5px;
 	input, select, textarea {
 	    display: block;
 	}
 	#recipients-list li, #triggerlocs-list li {
 		width: 200px;
+	}
+	fieldset {
+		border: 1px solid #ddd;
+		margin-bottom: 20px;
+		padding: 10px;
+	}
+	.or-separator {
+		div {
+			margin-top: -17px;
+			border-bottom: 1px solid #ddd;
+		}
+		span {
+			text-align: center;
+			color: rgb(100, 100, 100);
+		}
 	}
 }
 

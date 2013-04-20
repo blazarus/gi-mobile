@@ -173,7 +173,7 @@ App.Routers.main = Backbone.Router.extend({
 		console.log("navigating to post message");
 		$("#loader").show();
 		App.postMsgView = new App.Views.PostMessage({ collection: App.locations });
-		App.postMsgView.render();
+		$(".main-content").html(App.postMsgView.render().$el);
 		$("#loader").hide();
 
 		$("nav li").removeClass("active");
