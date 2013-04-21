@@ -51,6 +51,7 @@ window.App = {
 			App.headerView.render();
 			App.router = new App.Routers.main();
 			Backbone.history.start({pushState: true});
+			console.log("Started router and history");
 		});
 
 		
