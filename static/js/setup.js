@@ -34,6 +34,14 @@ window.App = {
 		App.EventDispatcher = _.clone(Backbone.Events);
 		App.EventDispatcher.on('login_success', App.onLoginSuccess);
 
+		$(document).ajaxSend(function(event, request, settings) {
+			if (!settings.url.match(/^http:\/\//) && window.GI_SERVER_URL) {
+				var newUrl = window.GI_SERVER_URL + settings.url;
+				console.log("Intercepting an ajax request. New url:", settings.url);
+				settings.url = newUrl;
+			}
+		});
+
 		App.locations = new App.Collections.Locations();
 		var locsDeffered = App.locations.fetch();
 		App.allUsers = new App.Collections.Users();

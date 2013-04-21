@@ -1,8 +1,11 @@
+// javascript:debugger
+
+var Utils = {};
 /*
  * Inserts commas in a number
  * Takes either string or integer and returns string
  */
-var formatNum = function (num) {
+Utils.formatNum = function (num) {
 	//Check that this is a valid integer
 	num = parseInt(num, 10);
 
@@ -29,4 +32,15 @@ var formatNum = function (num) {
 	}
 	return isNeg ? "-" + newStr : newStr;
 
+};
+
+/**
+ * Wrap a url to intelligently deal with whether AJAX coming from 
+ * mobile app or website.
+ * @param  {string} url
+ * @return {string}
+ */
+Utils.wrapUrl = function (url) {
+	var host = GI_SERVER_URL ? GI_SERVER_URL : window.location.host;
+	return host + url;
 };
