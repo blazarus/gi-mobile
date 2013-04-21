@@ -11,6 +11,7 @@ window.App = {
 	Routers: {},
 	Views: {},
 	Templates: {
+		"header": null,
 		"login": null,
 		"userinfo": null,
 		"readMessages": null,
@@ -38,6 +39,8 @@ window.App = {
 		App.allUsers = new App.Collections.Users();
 		$.when(App.loadTemplates(), locsDeffered).then( function () {
 			console.log("Loaded both templates and locations");
+			App.headerView = new App.Views.Header();
+			App.headerView.render();
 			App.router = new App.Routers.main();
 			Backbone.history.start({pushState: true});
 		});

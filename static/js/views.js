@@ -1,5 +1,18 @@
 // javascript:debugger
 
+App.Views.Header = Backbone.View.extend({
+	el: "header",
+
+	template: function (attrs) {
+		return _.template(App.Templates.header)(attrs);
+	},
+
+	render: function () {
+		this.$el.html(this.template());
+		return this;
+	}
+});
+
 App.Views.ReadMessages = Backbone.View.extend({
 	el: ".main-content",
 
