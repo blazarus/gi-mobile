@@ -220,6 +220,7 @@ App.Routers.main = Backbone.Router.extend({
 App.Routers.ProjectBrowser = Backbone.Router.extend({
 	routes: {
 		"project-browser": "showDefault",
+		"project-browser/": "showNoneLoc",
 		"project-browser/location/:screenid": "showLocation",
 		"project-browser/:screenid": "showLocation",
 		"project-browser/group/:groupid": "showGroup",
@@ -251,9 +252,24 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 		this.navigate('/project-browser/'+screenid);
 	},
 
+	showNoneLoc: function () {
+		this.showLocation(App.Models.Location.prototype.noneLocId);
+	},
+
 	showLocation: function (screenid) {
 		var loader = $("#loader").show();
+		// Also support 'all' for showing all groups
+		if (screenid && screenid == "all") screenid = App.Models.Location.prototype.noneLocId;
 		var location = App.locations.get(screenid);
+
+		if (!location) {
+			loader.hide();
+			alert("Must provide a valid location");
+			if (screenid !== App.Models.Location.prototype.noneLocId) this.navigate('/project-browser/none', {trigger: true});
+		}
+
+		var _this = this;
+		if (location.isNoneLoc()) this.navigate('/project-browser/');
 		location.fetch({
 			success: function (model, response, options) {
 				$(".main-content").html(App.projectBrowserView.$el);
@@ -263,6 +279,7 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 			error: function (model, response, options) {
 				loader.hide();
 				alert("Error loading groups for this location.");
+				if (screenid !== App.Models.Location.prototype.noneLocId) _this.navigate('/project-browser/none', {trigger: true});
 			}
 		});
 	},

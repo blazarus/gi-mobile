@@ -426,8 +426,10 @@ app.get('/locations/:screenid', function (req, res) {
 
 var updateGroupsForLoc = function (location, successCallback, failureCallback) {
 	var url = "http://tagnet.media.mit.edu/groups?screenid="+location.screenid;
+	var resultPropertyName = "groups";
 	if (location.screenid.toLowerCase() == "none") {
 		var url = "http://tagnet.media.mit.edu/get_all_groups";
+		resultPropertyName = "res";
 		// clog("Checking tagnet for all groups,", url);
 		// return updateAllGroups(location, successCallback);
 	}
@@ -445,8 +447,11 @@ var updateGroupsForLoc = function (location, successCallback, failureCallback) {
 		}
 
 		body = JSON.parse(body);
-		if (body.error) return clog("Got error from tagnet:", body.error);
-		var count = 0, target = body.groups.length;
+		if (body.error) {
+			clog("Got error from tagnet:", body.error);
+			return failureCallback(body.error);
+		}
+		var count = 0, target = body[resultPropertyName].length;
 
 		var updateLoc = function (grp) {
 			location.groups.push(grp);
@@ -460,7 +465,7 @@ var updateGroupsForLoc = function (location, successCallback, failureCallback) {
 			}
 		}
 
-		for (var i=0,group; group=body.groups[i]; i++) {
+		for (var i=0,group; group=body[resultPropertyName][i]; i++) {
 			(function (group) {
 				clog("Group:", group.id, group.name);
 				Group.findOne({ groupid: group.id, name: group.name }, function (err, grp) {
@@ -549,7 +554,7 @@ var updateGroupsForLoc = function (location, successCallback, failureCallback) {
 app.get('/groups/:groupid', function (req, res) {
 	var groupid = req.params.groupid.trim();
 	clog("fetching group with groupid:", groupid);
-	Group.findOne({groupid: groupid}).populate('projects').exec(function (err, group) {
+	Group.findOne({groupid: groupid}).populate('projects location').exec(function (err, group) {
 		if (err) {
 			clog("Error finding group:", groupid, err);
 			return res.send(500, "Something went wrong: " + err);
@@ -613,16 +618,17 @@ var updateProjectsForGroup = function (group, successCallback) {
 							name: project.projectname,
 							location: group.location
 						});
-						proj.save(function (err) {
-							if (err) return clog("Error trying to save project in DB:", err);
-							clog(proj);
-							updateGroup(proj);
-						});
 					} else {
 						// Project saved, but need to add it to location
 						clog("Found project in DB:", proj);
-						updateGroup(proj);
+						// Override a possible bad project location created at some other point
+						proj.location = group.location;
 					}
+					proj.save(function (err) {
+						if (err) return clog("Error trying to save project in DB:", err);
+						clog(proj);
+						updateGroup(proj);
+					});
 					
 				});
 			})(project); // Seal in value for project
@@ -849,6 +855,17 @@ app.get('/dummyloc/getloc', function (req, res) {
 	if ('session' in req) {
 		res.json({status: 'ok', loc: req.session.dummyLoc });
 	}
+});
+
+app.get('/test', function (req, res) {
+	fs.readFile(__dirname + '/templates/indexbody.html', 'utf8', function (err, data) {
+		if (err) {
+			return console.log("Error reading index.html", err);
+		}
+		var t = _.template(data)();
+		clog("Sending rendered template");
+		res.send(t);
+	});
 });
 
 app.get('/*', function(req, res){

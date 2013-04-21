@@ -486,9 +486,13 @@ ProjectSchema.methods.fetch = function (success, failure) {
 
 		_this.description = body.longdescription;
 		_this.name = body.projectname;
+		// Have to hard code this in - an inconsistency issue in PLDB/location data
+		body.location = (body.location.toLowerCase() != "pond") ? body.location : "e15-383-1";
 
 		Location.findOne()
-			.or([{ name: body.location }, { screenid: body.location }])
+			.or([{ name: body.location },
+				{ name: body.location.toLowerCase() },
+			 	{ screenid: body.location.toLowerCase() }])
 			.exec( function (err, location) {
 				if (err || !location) {
 					clog("Error finding a location with name or screenid:", body.location, err);
@@ -585,7 +589,7 @@ LocationSchema.statics.fetchAll = function () {
 						if (!location) {
 							// Need to create location
 							clog("Location was null, so add it..");
-							location = new Location({ screenid: loc.name });
+							location = new Location({ screenid: loc.name.toLowerCase() });
 							location.fetch(function () {}, function () {});
 						} else {
 							// Project saved, but need to add it to location

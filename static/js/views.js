@@ -10,7 +10,7 @@ App.Views.ReadMessages = Backbone.View.extend({
 
 	initialize: function () {
 		this.page = 0;
-		this.lastPage = Math.floor(this.collection.total/this.options.resultsPerPage);
+		this.lastPage = Math.max(Math.ceil(this.collection.total/this.options.resultsPerPage - 1), 0);
 
 		// Initial rendering
 		var tplt = this.template();
@@ -68,7 +68,8 @@ App.Views.ReadMessages = Backbone.View.extend({
 		this.$(".pager li").removeClass("disabled");
 		if (this.page == 0) {
 			this.$(".pager #newer").addClass("disabled");
-		} else if (this.page == this.lastPage) {
+		} 
+		if (this.page == this.lastPage) {
 			this.$(".pager #older").addClass("disabled");
 		}
 		this.$(".pageNumber").text("Page " + (this.page+1) + " of " + (this.lastPage+1));
@@ -89,7 +90,7 @@ App.Views.MessageList = Backbone.View.extend({
 	el: ".message-list",
 
 	initialize: function () {
-		this.listenTo(this.collection, 'add remove', this.render);
+		this.listenTo(this.collection, 'add', this.render);
 
 		this.messageView = this.options.messageView || App.Views.Message;
 	},
@@ -163,8 +164,19 @@ App.Views.NewMessage = Backbone.View.extend({
 	},
 
 	closeMessage: function () {
-		this.$el.fadeOut('slow');
-		App.User.markMessageRead(this.model);
+		var thisView = this;
+		thisView.$el.fadeTo(
+			'slow', 0,
+			function () {
+				thisView.$el.slideUp({
+					duration:'slow',
+					complete: function () {
+						App.User.markMessageRead(thisView.model);
+					}
+				});
+				
+			}
+		);
 	},
 
 	render: function () {
@@ -443,18 +455,34 @@ App.Views.LocateListElemView = Backbone.View.extend({
 	className: "message",
 
 	events: {
-		"click .remove": "removeUser"
+		"click .close": "removeUser"
 	},
 
-	initialize: function () {
+	initialize: function (options) {
 		console.log("Initializing LocateListElemView");
+		this.parentView = options.parentView;
 
 		this.listenTo(this.model, 'change', this.render);
-		this.render();
 	},
 
 	removeUser: function (e) {
-		this.model.destroy();
+		var thisView = this;
+		thisView.$el.fadeTo(
+			'slow', 0,
+			function () {
+				thisView.$el.slideUp({
+					duration:'slow',
+					complete: function () {
+						if (thisView.parentView) {
+							thisView.parentView.removeSubView(thisView);
+						}
+						thisView.remove();
+					}
+				});
+				
+			}
+		);
+		
 	},
 
 	template: function () {
@@ -481,7 +509,7 @@ App.Views.LocateUserView = Backbone.View.extend({
 	el: ".main-content #locate",
 
 	events: {
-		"submit #add-user": "addUser"
+		"submit #add-user": "addUserSubmitted",
 	},
 
 	subviews: [],
@@ -489,20 +517,61 @@ App.Views.LocateUserView = Backbone.View.extend({
 	initialize: function () {
 		console.log("Initializing LocateUserView");
 
-		this.listenTo(this.collection, 'add remove', this.render);
+		// this.listenTo(this.collection, 'add remove', this.render);
+
+		var searchUsers = _.debounce(function (query, process) {
+			return $.get('/typeahead/users', { query: query }, function (resp) {
+				var opts = _.pluck(resp.options, "username");
+				return process(opts);
+			});
+		}, 200);
+		var _this = this;
+		$('#add-user input:text').typeahead({
+			source: function (query, process) {
+				searchUsers(query, process);
+			},
+			matcher: function (item) {
+				// make sure any of my results returned from server are deemed ok
+				return true; 
+			},
+			updater: function (item) {
+				console.log("item:", item);
+				_this.addUser(item);
+				return item;
+			}
+		});
 	},
 
-	addUser: function (e) {
-		e.preventDefault();
+	addUserSubmitted: function (e) {
+		if (e) e.preventDefault();
 		var uname = this.$("#add-user input#username").val();
 		console.log("Trying to add user:", uname);
+		this.addUser(uname);
+		
+		this.$("#add-user input#username").val("").focus();
+		return this;
+	},
+
+	addUser: function (username) {
+		console.log("Trying to add user:", username);
+		$(".typeahead").hide();
 		var _this = this;
-		var user = App.allUsers.create({username: uname}, {
+		var user = App.allUsers.create({username: username}, {
 			wait: true,
 			success: function (model, xhr, options) {
 				console.log("Successfully added model");
-				_this.collection.add(user);
-				console.log("followingUsers:", App.followingUsers);
+				if (!_.chain(_this.collection.models).pluck('id').contains(model.id).value()) {
+					_this.collection.add(user);
+					console.log("followingUsers:", App.followingUsers);
+					var subview = new App.Views.LocateListElemView({
+						model:user,
+						parentView: _this
+					});
+					_this.subviews.push(subview);
+					var el = subview.render().$el;
+					this.$("#userlist").prepend(el);
+				}
+				this.$("#add-user input#username").val("").focus();
 			},
 			error: function (model, xhr, options) {
 				model.destroy();
@@ -510,9 +579,11 @@ App.Views.LocateUserView = Backbone.View.extend({
 			}
 		});
 		console.log("user:", user);
-		
-		this.$("#add-user input#username").val("").focus();
-		return this;
+	},
+
+	removeSubView: function (view) {
+		this.subviews.pop(view);
+		this.collection.remove(view.model);
 	},
 
 	render: function () {
@@ -526,6 +597,8 @@ App.Views.LocateUserView = Backbone.View.extend({
 		// Now clear the subview list
 		this.subviews.length = 0;
 
+		var _this = this;
+
 		if (users.length == 0) {
 			this.$("#userlist").html("No users added yet");
 		} else {
@@ -535,9 +608,13 @@ App.Views.LocateUserView = Backbone.View.extend({
 			// render each subview, appending to our root element
 			users.each( function (user) {
 
-				var subview = new App.Views.LocateListElemView({model:user});
+				var subview = new App.Views.LocateListElemView({
+					model:user,
+					parentView: _this
+				});
+				_this.subviews.push(subview);
 				var el = subview.render().$el;
-				container.append(el);
+				container.prepend(el);
 			});
 			this.$("#userlist").append(container);
 		}
@@ -573,7 +650,7 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		this.locations = options.locations;
 		this.state = this.states.LOC;
 		this.node = this.user.get('location');
-		// this.listenTo(this.user, 'change:location', this.updateLoc);
+		this.listenTo(this.user, 'change:location', this.updateLoc);
 	},
 
 	updateLoc: function () {
