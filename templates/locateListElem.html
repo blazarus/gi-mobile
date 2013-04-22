@@ -4,8 +4,8 @@
 		<img class="pull-left img-rounded" src="<%= pictureUrl %>">
 
 		<div class="pull-left">
-			<span class="username"><%= username %></span><br/>
-			<span class="currloc"><%= location %></span>
+			<span class="username"><%= displayName %></span><br/>
+			<span class="currloc"><a href="/project-browser/location/<%= location.id %>"><%= location.get('displayName') %></a></span>
 		</div>
 	</div>
 

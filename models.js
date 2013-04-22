@@ -364,26 +364,28 @@ UserSchema.statics.createSpecial = function (success, failure) {
 RecommendationSchema.methods.createMessage = function (recUser, project, success, failure) {
 	var _this = this;
 	Location.getNoneLoc(function (err, loc) {
-		clog("project passed to createMessage:", project);
-		var subject = "Project recommendation!";
-		var body = "Based on your interests, we think you should check out " + project.name;
-		if (!this.message) {
-			Message.create({
-				sender: recUser,
-				to: [_this.user],
-				subject: subject,
-				body: body,
-				triggerLocs: loc
-			}, function (err, message) {
-				if (err) {
-					clog("Error saving recommendation message:", err);
-					return failure("Error saving recommendation message: "+ err);
-				}
-				clog("The recommendation message successfully saved:", message);
-				_this.message = message;
-				success(message);
-			});
-		}
+		Project.findOne({_id: project._id}).populate('location').exec(function (err, project) {
+			clog("project passed to createMessage:", project);
+			var subject = "Project recommendation!";
+			var body = "Based on your interests, you should check out <a href='/project-browser/project/" + project.pid + "'>" + project.name + "</a> at <a href='/project-browser/location/" + project.location.screenid + "'>" + project.location.displayName + "</a>.";
+			if (!this.message) {
+				Message.create({
+					sender: recUser,
+					to: [_this.user],
+					subject: subject,
+					body: body,
+					triggerLocs: loc
+				}, function (err, message) {
+					if (err) {
+						clog("Error saving recommendation message:", err);
+						return failure("Error saving recommendation message: "+ err);
+					}
+					clog("The recommendation message successfully saved:", message);
+					_this.message = message;
+					success(message);
+				});
+			}
+		});
 	});	
 };
 
@@ -393,7 +395,7 @@ RecommendationSchema.methods.createLocationMessage = function (recUser, project,
 	Project.findOne({_id: project._id}).populate('location').exec(function (err, project) {
 		clog("project passed to createMessage:", project);
 		var subject = "Project recommendation!";
-		var body = "Based on your interests, we think you should check out " + project.name + ", located at " + project.location.name;
+		var body = "You have been detected near a project you'd be interested in. Check out <a href='/project-browser/project/" + project.pid + "'>" + project.name + "</a> at <a href='/project-browser/location/" + project.location.screenid + "'>" + project.location.displayName + "</a>.";
 		if (!this.message) {
 			Message.create({
 				sender: recUser,
@@ -565,6 +567,11 @@ LocationSchema.pre('save', function (next) {
 LocationSchema.pre('save', function (next) {
 	this.screenid = this.screenid.toLowerCase();
 	next();
+});
+
+LocationSchema.virtual('displayName').get(function () {
+	if (this.name.toLowerCase() === this.screenid) return this.name;
+	else return this.name + " (" + this.screenid + ")";
 });
 
 LocationSchema.statics.getNoneLoc = function (callback) {

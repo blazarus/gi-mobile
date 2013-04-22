@@ -575,6 +575,8 @@ App.Views.LocateUserView = Backbone.View.extend({
 			wait: true,
 			success: function (model, xhr, options) {
 				console.log("Successfully added model");
+				user = model = App.allUsers.get(model.id);
+
 				if (!_.chain(_this.collection.models).pluck('id').contains(model.id).value()) {
 					_this.collection.add(user);
 					console.log("followingUsers:", App.followingUsers);
@@ -681,8 +683,8 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		} else {
 			this.state = this.states.LOC;
 		}
-		this.router.navigate('/project-browser/'+this.node.get('screenid'));
-		this.render();
+		this.router.navigate('/project-browser/'+this.node.get('screenid'), {trigger: true});
+		// this.render();
 	},
 
 	navToGroup: function (e) {

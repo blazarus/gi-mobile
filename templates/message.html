@@ -1,9 +1,15 @@
 <div class="msg-header">
 	<h4 class="subject"><%= subject %></h4>
 	<span class="pull-right">Created: <%= createdAt %></span>
-	From: <%= sender %><br />
-	To: <%= to.pluck('username') %><br />
-	Location: <%= triggerLocs.pluck('screenid') %>
+	From: <%= sender.get('displayName') %><br />
+	To: <%= to.pluck('displayName').join(', ') %><br />
+	<% if (!(triggerLocs.length === 1 && triggerLocs.models[0].isNoneLoc())) { %>
+		Shown because you were detected at 
+		<% triggerLocs.each(function (loc, idx) { %>
+			<a href="/project-browser/location/<%= loc.id %>"><%= loc.get('displayName') %></a>
+			<% if (idx !== triggerLocs.length-1) { %> or <% } %>
+		<% }) %>
+	<% } %>
 </div>
 <div class="msg-body well well-small">
 	<%= body %>

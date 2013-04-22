@@ -136,6 +136,14 @@ App.Models.User = Backbone.Model.extend({
 			clearInterval(this.intervalId);
 		});
 
+		if (this.get('firstname') && this.get('lastname')) {
+			this.set('fullname', this.get('firstname')+ " " + this.get('lastname'));
+		} else {
+			this.set('fullname', this.id);
+		}
+		var displayName = this.id === this.get('fullname') ? this.id : this.get('fullname') + " (" + this.id + ")";
+		this.set('displayName', displayName);
+
 		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
 		if (!this.isSpecialUser()) {
@@ -325,7 +333,8 @@ App.Models.Location = Backbone.Model.extend({
 	},
 
 	initialize: function () {
-
+		var displayName = this.get('name').toLowerCase() === this.id ? this.get('name') : this.get('name') + " (" + this.id + ")";
+		this.set('displayName', displayName);
 	},
 
 	toString: function () {
