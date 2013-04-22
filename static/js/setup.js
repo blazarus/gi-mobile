@@ -43,8 +43,15 @@ window.App = {
 		});
 
 		if (navigator.vibrate) {
-			navigator.notification.vibrate(2500);
+			function onDeviceReady() {
+				navigator.notification.vibrate(2500);
+				alert('in the if statement')
+			}
 		}
+		function onDeviceReady() {
+				navigator.notification.vibrate(2500);
+				alert('outside if statement');
+			}
 
 		App.locations = new App.Collections.Locations();
 		var locsDeffered = App.locations.fetch();
