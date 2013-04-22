@@ -141,6 +141,13 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 
 	newMessage: function (msg) {
 		if (App.phonegap) {
+			navigator.notification.alert(
+				"You have a new message",
+				alertDismissed,
+				"GI Mobile",
+				"Ok"
+			);
+			// Vibrate twice for a second with 200 ms in between
 			navigator.notification.vibrate(1000);
 			setTimeout(function () { 
 				navigator.notification.vibrate(1000); 
