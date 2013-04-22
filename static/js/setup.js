@@ -37,16 +37,18 @@ window.App = {
 		$(document).ajaxSend(function(event, request, settings) {
 			if (!settings.url.match(/^http:\/\//) && window.GI_SERVER_URL) {
 				var newUrl = window.GI_SERVER_URL + settings.url;
-				console.log("Intercepting an ajax request. New url:", settings.url);
+				console.log("Intercepting an ajax request. Old url:", settings.url, "New url:", newUrl);
 				settings.url = newUrl;
 			}
 		});
 
 		if ($("script[src='/js/model.js']").length > 0) {
 			// this is using phone gap. Set global variable 
+			javascript:debugger;
 			App.phonegap = true;
 			var onDeviceReady = function () {
 				console.log("Phonegap active - device ready");
+				alert("got here");
 				navigator.notification.vibrate(2000);
 				this.finishInit();
 			};
