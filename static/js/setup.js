@@ -48,6 +48,7 @@ window.App = {
 				alert('in the if statement')
 			}
 		}
+		document.addEventListener("deviceready", onDeviceReady, false);
 		function onDeviceReady() {
 				navigator.notification.vibrate(2500);
 				alert('outside if statement');
