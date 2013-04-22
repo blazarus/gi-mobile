@@ -42,6 +42,10 @@ window.App = {
 			}
 		});
 
+		if (navigator.vibrate) {
+			navigator.notification.vibrate(2500);
+		}
+
 		App.locations = new App.Collections.Locations();
 		var locsDeffered = App.locations.fetch();
 		App.allUsers = new App.Collections.Users();
