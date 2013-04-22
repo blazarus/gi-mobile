@@ -141,6 +141,9 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 
 	newMessage: function (msg) {
 		if (App.phonegap) {
+			var alertDismissed = function () {
+				alert("got here yay");
+			};
 			navigator.notification.alert(
 				"You have a new message",
 				alertDismissed,
