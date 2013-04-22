@@ -869,7 +869,7 @@ app.get('/test', function (req, res) {
 });
 
 app.get('/*', function(req, res){
-	fs.readFile(__dirname + '/index.html', 'utf8', function (err, data) {
+	fs.readFile(__dirname + '/templates/index.html', 'utf8', function (err, data) {
 		if (err) {
 			return console.log("Error reading index.html", err);
 		}
