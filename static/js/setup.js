@@ -44,13 +44,14 @@ window.App = {
 
 		if ($("script[src='phonegap.js']").length > 0) {
 			// this is using phone gap. Set global variable 
-			javascript:debugger;
 			App.phonegap = true;
 			var onDeviceReady = function () {
+				alert('ok')
 				console.log("Phonegap active - device ready");
 				alert("got here");
 				navigator.notification.vibrate(2000);
 				this.finishInit();
+				alert('got here more');
 			};
 			document.addEventListener("deviceready", onDeviceReady, false);
 		} else this.finishInit();
