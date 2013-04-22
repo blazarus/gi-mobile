@@ -23,7 +23,8 @@ window.App = {
 		"viewCharms": null,
 		"charmListElem": null,
 		"projectInfo": null,
-		"projectRecommendation": null
+		"projectRecommendation": null,
+		"projectbrowser": null
 	},
 	User: null, // The logged in user (null when not logged in)
 	options: {
@@ -64,7 +65,9 @@ window.App = {
 			App.headerView.render();
 			App.router = new App.Routers.main();
 			Backbone.history.start({pushState: true});
-			App.router.navigate('/', {trigger: true});
+			if (App.phonegap) {
+				App.router.navigate('/', {trigger: true});
+			}
 			console.log("Started router and history");
 		});
 	},

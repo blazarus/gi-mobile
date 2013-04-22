@@ -142,6 +142,9 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 	newMessage: function (msg) {
 		if (App.phonegap) {
 			navigator.notification.vibrate(1000);
+			setTimeout(function () { 
+				navigator.notification.vibrate(1000); 
+			}, 1200);
 		}
 		$(".modal").modal();
 	},
@@ -648,7 +651,13 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 
 	events: {
 		"click .add-charm": "addCharm",
-		"click .remove-charm": "removeCharm"
+		"click .remove-charm": "removeCharm",
+		"click .group": "navToGroup",
+		"click .project": "navToProject"
+	},
+
+	template: function (attrs) {
+		return _.template(App.Templates.projectbrowser)(attrs);
 	},
 
 	state: null,
@@ -676,9 +685,20 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 		this.render();
 	},
 
+	navToGroup: function (e) {
+		this.router.navigate('/project-browser/group/' + e.target.getAttribute("id"), {trigger: true});
+	},
+
+	navToProject: function (e) {
+		this.router.navigate('/project-browser/project/' + e.target.getAttribute("id"), {trigger: true});
+	},
+
 	showLoc: function (location) {
 		this.node = location;
 		this.state = this.states.LOC;
+		if (this.node.isNoneLoc()) {
+			this.state = this.states.NOLOC;
+		}
 		return this.render();
 	},
 
@@ -722,112 +742,24 @@ App.Views.ProjectBrowser = Backbone.View.extend({
 	render: function () {
 		console.log("Rendering project browser. state:", this.state);
 		this.$el.empty();
-		for (var i=0,subview; subview=this.subViews[i]; i++) {
-			subview.remove();
-		}
-		this.subViews = [];
 
-		this.$el.html(this.user.get('location').get('screenid'));
-
-		switch (this.state) {
-			case this.states.NOLOC:
-				this.renderLoc();
-				break;
-			case this.states.LOC:
-				this.renderLoc();
-				break;
-			case this.states.GROUP:
-				this.renderGroup();
-				break;
-			case this.states.PROJ:
-				this.renderProject();
-				break;
+		if (this.state == this.states.PROJ) {
+			this.node.set('isCharmed', !!App.charms.get(this.node));
 		}
+		var tplt = this.template({
+			states: this.states,
+			state: this.state,
+			node: this.node
+		});
+		this.$el.html($(tplt.trim()));
 		
 		// Make sure events are bound
 		this.delegateEvents(this.events);
 
 		return this;
 	},
-
-	renderLoc: function () {
-		var _this = this;
-		var container = $(document.createDocumentFragment()); 
-		var numGroups = this.node.get('groups').length;
-		for (var i=0; i < numGroups; i++) {
-			var group = this.node.get('groups')[i];
-			(function (group) {
-				console.log("group", i, group);
-				var button = new App.Views.ProjectBrowser.Button({ model: group });
-				_this.subViews.push(button);
-				_this.listenTo(button, 'click', function (e) {
-					console.log("clicked group", i, group);
-					this.router.navigate('/project-browser/group/' + group.get('groupid'), {trigger: true});
-				});
-				container.append(button.render().$el);
-			})(group);
-			
-		}
-		_this.$el.append(container);
-	},
-
-	renderGroup: function () {
-		var _this = this;
-		var container = $(document.createDocumentFragment()); 
-		var numProjects = this.node.get('projects').length;
-		for (var i=0; i < numProjects; i++) {
-			var project = this.node.get('projects')[i];
-			(function (project) {
-				var button = new App.Views.ProjectBrowser.Button({ model: project });
-				_this.subViews.push(button);
-				_this.listenTo(button, 'click', function (e) {
-					console.log(button);
-					this.router.navigate('/project-browser/project/' + project.get('pid'), {trigger: true});
-				});
-				container.append(button.render().$el);
-			})(project);
-			
-		}
-		_this.$el.append(container);
-	},
-
-	renderProject: function () {
-		var isCharmed = !!App.charms.get(this.node);
-		
-		console.log("Is this project charmed?", isCharmed);
-
-		var tplt = _.template(App.Templates.projectInfo)({
-			name: this.node.get('name'),
-			description: this.node.get('description'),
-			isCharmed: isCharmed
-		});
-		this.$el.append($(tplt));
-
-	}
 });
 
-App.Views.ProjectBrowser.Button = Backbone.View.extend({
-	tagName: "button",
-
-	className: "btn",
-
-	events: {
-		"click": "click"
-	},
-
-	initialize: function () {
-		// this.model is a Group
-	},
-
-	click: function (e) {
-		this.trigger('click');
-	},
-
-	render: function () {
-		this.$el.text(this.model.get('name'));
-		return this;
-	}
-});
 
 App.Views.Charms = Backbone.View.extend({
 	el: "#viewcharms",

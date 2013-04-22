@@ -5,8 +5,11 @@
    ========================================================================== */
 
 /* Layout */
-h1, h2 {
+h1, h2, h3 {
     text-align: center;
+	// font-family: Helvetica Neue, sans-serif;
+	// color: #FFF;
+	// font-weight: 100;
 }
 
 .nav {
@@ -23,8 +26,21 @@ h1, h2 {
 	margin: 8px 0;
 	// visibility: hidden;
 	text-align: center;
-	span {
-		display: inline-block;
+	@media (min-width: 481px) {
+		span {
+			display: inline-block;
+		}
+		span:not(:last-child):after {
+			content: " | ";
+		}
+	}
+	@media (max-width: 480px) {
+		span {
+			display: block;
+			:after {
+				content: "";
+			}
+		}
 	}
 }
 
@@ -40,12 +56,13 @@ h1, h2 {
 
 .message-list {
 	list-style: none;
-	
-	// li:hover {
-	// 		opacity: 0;
+}
 
-
-	// 	}
+html, body {
+	// background: -webkit-gradient(linear, left top, left bottom, from(#0F0F0F), color-stop(40%, #252525), to(#090909));
+	// font-family: Helvetica Neue, sans-serif;
+	// color: #FFF;
+	// font-weight: 100;
 }
 
 li.message {
@@ -66,8 +83,6 @@ li.message {
 	}
 }
 
-
-
 .main-content {
 	#locate {
 		form#add-user {
@@ -83,7 +98,31 @@ li.message {
 		}
 	}
 	#project-browser {
-
+		ul {
+			list-style: none;
+			button {
+				// Make the button look like actual GI
+				// background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#222), color-stop(100%,#121212));
+				// border: 1px solid #222;
+				// font-family: Helvetica Neue, sans-serif;
+				// color: #FFF;
+				// font-weight: 100;
+			}
+			@media (min-width: 481px) {
+				li {
+					display: inline-block;
+				}
+			}
+			@media (max-width: 480px) {
+				li {
+					display: block;
+					width: 100%;
+					button {
+						width: 100%;
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -150,18 +189,19 @@ li.message {
 	background-image: -ms-linear-gradient( #444,#222 );
 	background-image: -o-linear-gradient( #444,#222 );
 	background-image: linear-gradient( #444,#222 );
+	.icon-loading {
+		background: url(images/ajax-loader.gif);
+		background-size: 46px 46px;
+		display: block;
+		margin: auto;
+		width: 44px;
+		height: 44px;
+		padding: 1px;
+		-webkit-border-radius: 36px;
+		border-radius: 36px;
+	}
 }
 
-.icon-loading {
-	background: url(images/ajax-loader.gif);
-	background-size: 46px 46px;
-	display: block;
-	margin: auto;
-	width: 44px;
-	height: 44px;
-	padding: 1px;
-	-webkit-border-radius: 36px;
-	border-radius: 36px;
-}
+
 
 

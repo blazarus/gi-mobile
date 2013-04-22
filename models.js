@@ -179,7 +179,7 @@ UserSchema.methods.getUnreadMessages = function (success, failure) {
 UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 	// Get recommendations from tagnet
 	var thisUser = this;
-	var limit = 50;
+	var limit = 15;
 	var memberOrSponsor = this.isMember() ? "person" : "sponsor";
 	var url = "http://gi.media.mit.edu/luminoso2/match/projects?" + memberOrSponsor + "=" + this.username + "&limit=" + limit;
 	request.get(url, function (err, response, body) {
@@ -488,6 +488,8 @@ ProjectSchema.methods.fetch = function (success, failure) {
 		_this.name = body.projectname;
 		// Have to hard code this in - an inconsistency issue in PLDB/location data
 		body.location = (body.location.toLowerCase() != "pond") ? body.location : "e15-383-1";
+		body.location = (body.location.toLowerCase() != "e15-421") ? body.location : "e15-443-1";
+
 
 		Location.findOne()
 			.or([{ name: body.location },

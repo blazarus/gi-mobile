@@ -1,0 +1,31 @@
+
+<% if (state === states.LOC || state === states.NOLOC) { %>
+	<% if (state === states.LOC) { %>
+		<h3>Groups for <%= node.get('name') %></h3>
+	<% } else { %>
+		<h3>All Groups</h3>
+	<% } %>
+	<ul>
+		<% for (var i=0,group; group=node.get('groups')[i]; i++) { %>
+		<li><button id="<%= group.id %>" class="group btn btn-large"><%= group.get('name') %></button></li>
+		<% } %>
+	</ul>
+<% } else if (state === states.GROUP) { %>
+	<h3></h3>
+	<ul>
+		<% for (var i=0,project; project=node.get('projects')[i]; i++) { %>
+		<li><button id="<%= project.id %>" class="project btn btn-large"><%= project.get('name') %></button></li>
+		<% } %>
+	</ul>
+<% } else if (state === states.PROJ) { %>
+	<h3><%= node.get('name') %></h3>
+	<div><%= node.get('description') %></div>
+	<% if (node.get('isCharmed')) { %>
+		<h4>You've charmed this project!</h4>
+		<button class="btn remove-charm">Remove this charm</button>
+	<% } else { %>
+		<button class="btn add-charm">Charm this project</button>
+	<% } %>
+<% } else { %>
+	else whatwhat
+<% } %>
