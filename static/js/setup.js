@@ -42,7 +42,7 @@ window.App = {
 			}
 		});
 
-		if ($("script[src='/js/model.js']").length > 0) {
+		if ($("script[src='phonegap.js']").length > 0) {
 			// this is using phone gap. Set global variable 
 			javascript:debugger;
 			App.phonegap = true;
