@@ -140,10 +140,9 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 	},
 
 	newMessage: function (msg) {
-		// javascript:debugger;
-		// Open a modal dialog saying You have a new message (or recommendation)
-		// and have two buttons - one saying go to message, which takes you to New messages tab
-		// the other saying Read later in New Messages tab
+		if (App.phonegap) {
+			navigator.notification.vibrate(1000);
+		}
 		$(".modal").modal();
 	},
 

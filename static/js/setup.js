@@ -46,12 +46,9 @@ window.App = {
 			// this is using phone gap. Set global variable 
 			App.phonegap = true;
 			var onDeviceReady = function () {
-				alert('ok')
 				console.log("Phonegap active - device ready");
-				alert("got here");
-				navigator.notification.vibrate(2000);
+				// Make sure phonegap set up before continuing
 				App.finishInit();
-				alert('got here more');
 			};
 			document.addEventListener("deviceready", onDeviceReady, false);
 		} else App.finishInit();
