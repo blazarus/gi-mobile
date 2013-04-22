@@ -278,7 +278,6 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 			},
 			error: function (model, response, options) {
 				loader.hide();
-				alert("Error loading groups for this location.");
 				if (screenid !== App.Models.Location.prototype.noneLocId) _this.navigate('/project-browser/none', {trigger: true});
 			}
 		});
