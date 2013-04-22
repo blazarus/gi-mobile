@@ -3,9 +3,6 @@
 $( function () {
 	checkParams();
 
-	// Make sure templates are loaded before running main logic
-	// Check if templates have loaded every ten ms
-	// blockUntilTrue(checkTemplates, window.App.init, 10);
 	window.App.init();
 });
 

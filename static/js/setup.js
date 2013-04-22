@@ -42,18 +42,19 @@ window.App = {
 			}
 		});
 
-		if (navigator.vibrate) {
-			function onDeviceReady() {
-				navigator.notification.vibrate(2500);
-				alert('in the if statement')
-			}
-		}
-		document.addEventListener("deviceready", onDeviceReady, false);
-		function onDeviceReady() {
-				navigator.notification.vibrate(2500);
-				alert('outside if statement');
-			}
+		if ($("script[src='/js/model.js']").length > 0) {
+			// this is using phone gap. Set global variable 
+			App.phonegap = true;
+			var onDeviceReady = function () {
+				console.log("Phonegap active - device ready");
+				navigator.notification.vibrate(2000);
+				this.finishInit();
+			};
+			document.addEventListener("deviceready", onDeviceReady, false);
+		} else this.finishInit();
+	},
 
+	finishInit: function () {
 		App.locations = new App.Collections.Locations();
 		var locsDeffered = App.locations.fetch();
 		App.allUsers = new App.Collections.Users();
@@ -66,9 +67,8 @@ window.App = {
 			App.router.navigate('/', {trigger: true});
 			console.log("Started router and history");
 		});
-
-		
 	},
+
 	loadTemplates: function () {
 		console.log("Attempting to load templates");
 		var startTime = new Date();
