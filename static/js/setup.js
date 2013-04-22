@@ -50,11 +50,11 @@ window.App = {
 				console.log("Phonegap active - device ready");
 				alert("got here");
 				navigator.notification.vibrate(2000);
-				this.finishInit();
+				App.finishInit();
 				alert('got here more');
 			};
 			document.addEventListener("deviceready", onDeviceReady, false);
-		} else this.finishInit();
+		} else App.finishInit();
 	},
 
 	finishInit: function () {
