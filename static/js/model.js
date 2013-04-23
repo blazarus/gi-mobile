@@ -148,7 +148,6 @@ App.Models.User = Backbone.Model.extend({
 		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
 		if (!this.isSpecialUser() && options.fetch !== false) {
-			javascript:debugger;
 			// Recommender is a fake user in our system so won't have a location
 			var _this = this;
 			_this.checkLocation(_this);
