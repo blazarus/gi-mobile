@@ -4,11 +4,7 @@
 		<label class="checkbox">
 			<input id="toggle-allusers" class="input-block-level" type="checkbox"<%= message.isForAllUsers() ? 'checked' : '' %>> Send to all users
 		</label>
-		<div class="or-separator row-fluid">
-			<div class="span5"></div>
-			<span class="span2">OR</span>
-			<div class="span5"></div>
-		</div>
+		
 		<label for="send-to">Add a recipient:</label>
 		<input id="send-to" name="send-to" class="input-block-level" type="text" data-provide="typeahead" <%= message.isForAllUsers() ? 'disabled' : '' %>>
 		<ul id="recipients-list">
@@ -27,19 +23,10 @@
 		<label class="checkbox">
 			<input type="checkbox" id="toggle-alllocs" <%= message.isForAllLocs() ? 'checked' : '' %> > Send to all locations
 		</label>
-		<div class="or-separator row-fluid">
-			<div class="span5"></div>
-			<span class="span2">OR</span>
-			<div class="span5"></div>
-		</div>
-		<label for="loc">Select a location:</label>
+		
+		<label for="loc">Add a location:</label>
 		<input id="triggerLocs" name="triggerLocs" class="input-block-level" type="text" <%= message.isForAllLocs() ? 'disabled' : '' %>>
-		<!-- <select id="loc" name="loc" class="input-block-level"<%= message.isForAllLocs() ? 'disabled' : '' %>>
-			<option>--Select a location--</a>
-			<% locations.each( function (loc) { %> 
-				<option><%= loc.get('screenid') %></a>
-			<% }); %>
-		</select> -->
+
 		<ul id="triggerlocs-list">
 			<% message.get('triggerLocs').each( function (loc) { %> 
 				<% if (!loc.isNoneLoc()) { %> 

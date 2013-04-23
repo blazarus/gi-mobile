@@ -5,7 +5,12 @@
 
 		<div class="pull-left">
 			<span class="username"><%= displayName %></span><br/>
-			<span class="currloc"><a href="/project-browser/location/<%= location.id %>"><%= location.get('displayName') %></a></span>
+			<% if (location.isNoneLoc()) { %>
+			<span class="currloc">This user has not been seen recently.</span>
+			<% } else { %>
+			<span class="currloc"><a href="/project-browser/location/<%= location.id %>">Last location: <%= location.get('displayName') %></a></span><br/>
+			<span class="lastseen">Last seen at: <%= tstamp %></span>
+			<% } %>
 		</div>
 	</div>
 

@@ -126,11 +126,11 @@ App.Models.User = Backbone.Model.extend({
 		return '/user/' + this.id;
 	},
 
-	initialize: function () {
-		this.setup();
+	initialize: function (attrs, options) {
+		this.setup(attrs, options);
 	},
 
-	setup: function () {
+	setup: function (attrs, options) {
 		this.on('destroy', function (e) {
 			// Make sure to clean up the interval timer
 			clearInterval(this.intervalId);
@@ -146,7 +146,7 @@ App.Models.User = Backbone.Model.extend({
 
 		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
-		if (!this.isSpecialUser()) {
+		if (!this.isSpecialUser() || options.fetch !== false) {
 			// Recommender is a fake user in our system so won't have a location
 			var _this = this;
 			_this.checkLocation(_this);
@@ -333,7 +333,8 @@ App.Models.Location = Backbone.Model.extend({
 	},
 
 	initialize: function () {
-		var displayName = this.get('name').toLowerCase() === this.id ? this.get('name') : this.get('name') + " (" + this.id + ")";
+		var regex = new RegExp("^"+this.get('name').toLowerCase());
+		var displayName = this.id.match(regex) ? this.get('name') : this.get('name') + " (" + this.id + ")";
 		this.set('displayName', displayName);
 	},
 

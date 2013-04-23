@@ -112,7 +112,6 @@ app.get('/typeahead/users', function (req, res) {
 		},{
 			lastname: { $in : regexList }
 		}])
-		.select('username')
 		.exec( function (err, users) {
 		clog("typeahead users", users);
 		res.json({ options: users });

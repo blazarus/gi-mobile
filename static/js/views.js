@@ -275,21 +275,38 @@ App.Views.PostMessage = Backbone.View.extend({
 	setupTypeahead: function () {
 		var _this = this;
 
-		var searchUsers = _.debounce(function (query, process) {
-			return $.get('/typeahead/users', { query: query }, function (resp) {
-				var opts = _.pluck(resp.options, "username");
-				return process(opts);
-			});
-		}, 200);
+		$('#send-to').multisuggest({
+			sources: [
+				{
+					data: "/typeahead/users",
+					queryParam: "query",
+					type: "url",
+					listFormatter: function(item, term) {
+						var user = new App.Models.User(item, { fetch: false });
+						var compiled = _.template("<img src='<% print(user.get('pictureUrl')) %>'></img><% print(hl(user.get('displayName'))) %>");
+						return compiled({
+							hl: $.proxy($.fn.multisuggest.highlighter, this, term),
+							user: user
+						});
+					},
+					inputFormatter: function(item) {
+						// var compiled = _.template("<%= first %> <%= last %>");
 
-		$('#send-to').typeahead({
-			source: function (query, process) {
-				searchUsers(query, process);
-			},
-			matcher: function (item) {
-				// make sure any of my results returned from server are deemed ok
-				return true; 
-			},
+						return item.username;
+					},
+					valueAttribute: function(item) {
+						return item.username;
+					},
+					resultsProcessor: function(data) {
+						return data.options;
+					},
+					header: "Users",
+					delay: 200,
+					maxEntries: 5
+				}
+			],
+			loadingIconClass: 'msuggest-loading',
+			noResultsText: 'No matching users.',
 			updater: function (item) {
 				console.log("item:", item);
 				var newUser = App.allUsers.getOrCreate({username: item});
@@ -486,7 +503,7 @@ App.Views.UserView = Backbone.View.extend({
 		// this.$el.css('visibility', 'visible');
 		var uname = this.model.get('username')
 		var loc = this.model.get('location');
-		var locText = loc ? loc.get('screenid') : "Searching...";
+		var locText = loc ? loc.get('displayName') : "Searching...";
 		var lastseen = this.model.get('tstamp');
 		var stale = this.model.isStale();
 
@@ -578,21 +595,37 @@ App.Views.LocateUserView = Backbone.View.extend({
 
 		// this.listenTo(this.collection, 'add remove', this.render);
 
-		var searchUsers = _.debounce(function (query, process) {
-			return $.get('/typeahead/users', { query: query }, function (resp) {
-				var opts = _.pluck(resp.options, "username");
-				return process(opts);
-			});
-		}, 200);
 		var _this = this;
-		$('#add-user input:text').typeahead({
-			source: function (query, process) {
-				searchUsers(query, process);
-			},
-			matcher: function (item) {
-				// make sure any of my results returned from server are deemed ok
-				return true; 
-			},
+		$('#add-user input:text').multisuggest({
+			sources: [
+				{
+					data: "/typeahead/users",
+					queryParam: "query",
+					type: "url",
+					listFormatter: function(item, term) {
+						var user = new App.Models.User(item, { fetch: false });
+						var compiled = _.template("<img class='img-small' src='<% print(user.get('pictureUrl')) %>'></img><% print(hl(user.get('displayName'))) %>");
+						return compiled({
+							hl: $.proxy($.fn.multisuggest.highlighter, this, term),
+							user: user
+						});
+					},
+					inputFormatter: function(item) {
+						return item.username;
+					},
+					valueAttribute: function(item) {
+						return item.username;
+					},
+					resultsProcessor: function(data) {
+						return data.options;
+					},
+					header: "Users",
+					delay: 200,
+					maxEntries: 5
+				}
+			],
+			loadingIconClass: 'msuggest-loading',
+			noResultsText: 'No matching users.',
 			updater: function (item) {
 				console.log("item:", item);
 				_this.addUser(item);
@@ -660,25 +693,21 @@ App.Views.LocateUserView = Backbone.View.extend({
 
 		var _this = this;
 
-		if (users.length == 0) {
-			this.$("#userlist").html("No users added yet");
-		} else {
-			// Improve performance by not doing append for each list elem,
-			// which causes a page reflow each time
-			var container = $(document.createDocumentFragment()); 
-			// render each subview, appending to our root element
-			users.each( function (user) {
+		// Improve performance by not doing append for each list elem,
+		// which causes a page reflow each time
+		var container = $(document.createDocumentFragment()); 
+		// render each subview, appending to our root element
+		users.each( function (user) {
 
-				var subview = new App.Views.LocateListElemView({
-					model:user,
-					parentView: _this
-				});
-				_this.subviews.push(subview);
-				var el = subview.render().$el;
-				container.prepend(el);
+			var subview = new App.Views.LocateListElemView({
+				model:user,
+				parentView: _this
 			});
-			this.$("#userlist").append(container);
-		}
+			_this.subviews.push(subview);
+			var el = subview.render().$el;
+			container.prepend(el);
+		});
+		this.$("#userlist").append(container);
 		return this;
 	}
 

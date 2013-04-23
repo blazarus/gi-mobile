@@ -1,10 +1,12 @@
 <div id="locate">
 	<h2>Locate</h2>
-	<form id="add-user">
-		<label for="username"></label>
-		<input id="username" type="text" autocomplete="off" required>
-		<input type="submit" value="Add" class="btn">
-	</form>
+	<div class="row-fluid">
+		<form id="add-user" class="form-inline offset4 span4">
+			<label for="username"></label>
+			<input id="username" type="text" autocomplete="off" required>
+			<span class="help-block">Type in the name of a user to follow their location in the Lab.</span>
+		</form>
+	</div>
 	<ul id="userlist" class="message-list">
 	</ul>
 </div>
