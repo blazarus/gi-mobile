@@ -186,6 +186,19 @@ App.Models.User = Backbone.Model.extend({
 	checkLocation: function () {
 		var _this = this;
 		if (!App.options.DUMMY_LOC) {
+			$.get('/user/' + _this.id + '/location/update', function (resp) {
+				if (resp.status && resp.status == "ok") {
+					var loc = App.locations.get(resp.user.currloc.screenid);
+					var tstamp = new Date(resp.user.lastseen);
+					if (_this.get('location') != loc || _this.get('tstamp') - tstamp != 0) {
+						console.log("Updating location/tstamp", _this.get('username'), loc, _this.get('location'), tstamp, _this.get('tstamp'));
+						_this.set({
+							location: loc,
+							tstamp: tstamp
+						});
+					}
+				}
+			});
 			$.getJSON('http://gi-ego.media.mit.edu/' + _this.get("username") + '/events/1', function (resp) {
 
 				// If there are no events, there never have been,
@@ -194,14 +207,14 @@ App.Models.User = Backbone.Model.extend({
 				if (resp && resp.events.length > 0 && resp.events[0].readerid && resp.events[0].tstamp) {
 					var screenid = resp.events[0].readerid;
 					var loc = App.locations.get(screenid);
-					var tstmp = resp.events[0].tstamp;
-					tstmp = new Date(tstmp);
+					var tstamp = resp.events[0].tstamp;
+					tstamp = new Date(tstamp);
 					// Only update the model if there is a change
-					if (_this.get('location') != loc || _this.get('tstamp') - tstmp != 0) {
-						console.log("Updating location/tstamp", _this.get('username'), loc, _this.get('location'), tstmp, _this.get('tstamp'));
+					if (_this.get('location') != loc || _this.get('tstamp') - tstamp != 0) {
+						console.log("Updating location/tstamp", _this.get('username'), loc, _this.get('location'), tstamp, _this.get('tstamp'));
 						_this.set({
 							location: loc,
-							tstamp: tstmp
+							tstamp: tstamp
 						});
 
 					}

@@ -146,6 +146,66 @@ UserSchema.methods.isStale = function () {
 	return true;
 };
 
+/**
+ * Checks the location of the user, 
+ * emits event if new location OR new timestamp
+ * @param  {EventEmitter} eventEmitter
+ * @param  {function} success callback 
+ * @param  {function} failure callback - takes an error string
+ */
+UserSchema.methods.checkLocation = function (eventEmitter, success, failure) {
+	var thisUser = this;
+	var url = 'http://gi-ego.media.mit.edu/' + this.username + '/events/1';
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
+		if (err) {
+			clog("Got error getting location:", err, thisUser);
+			return failure(err);
+		} else if (response.statusCode != "200") {
+			clog("Bad response code:", response.statusCode, thisUser);
+			return failure("Bad response code: "+response.statusCode)
+		}
+		try {
+			body = JSON.parse(body);
+		} catch (exception) {
+			clog("Error parsing response body:", exception, thisUser);
+			return failure(exception);
+		}
+		if (!(body && body.events.length > 0 && body.events[0].readerid && body.events[0].tstamp)) {
+			clog("Error getting location:", body, thisUser);
+			return failure("Error getting location: " + body);
+		}
+
+		var screenid = body.events[0].readerid;
+		var lastseen = new Date(body.events[0].tstamp);
+
+		Location.findOne({ screenid: screenid }, function (err, location) {
+			if (err || !location) {
+				clog("Error getting location from DB:", err, location);
+				return failure("Error getting location from DB: " + err);
+			}
+
+			clog(location.id, thisUser.currloc, thisUser.currloc != location.id, lastseen, thisUser.lastseen, thisUser.lastseen - lastseen != 0);
+
+			if (thisUser.currloc != location.id || thisUser.lastseen - lastseen != 0) {
+				// New location or timestamp, so emit event
+				thisUser.currloc = location;
+				thisUser.lastseen = lastseen;
+				thisUser.save(function (err) {
+					if (err) {
+						clog("Error saving user:", err, thisUser);
+						return failure('Error saving user: ' + err);
+					}
+					clog("Updated user location info in DB:", thisUser);
+					clog("Emitting event for updated location");
+					eventEmitter.emit('location_updated', thisUser);
+					return success(thisUser);
+				});
+			}
+		});
+
+	});
+};
+
 UserSchema.methods.getUnreadMessages = function (success, failure) {
 	var _this = this;
 	var readMsgIds = _.pluck(this.readMessages, 'message');
@@ -390,34 +450,39 @@ UserSchema.statics.fetchAllSponsors = function (success, failure) {
 							username: username,
 						});
 					}
-					request.get('http://data.media.mit.edu/spm/contacts/json?username='+username, function (err, response, body) {
-						if (err || response.statusCode != "200") {
-							return clog("Got error getting recommendations:", response.statusCode, err);
-						}
-
-						try {
-							body = JSON.parse(body);
-						} catch (exception) {
-							return clog("Error parsing response body:", exception);
-						}
-						
-						if (body.error || !body.profile) {
-							return clog("Got error from data.media.mit.edu:", username, body.error, body.profile);
-						}
-
-						// Valid user, so cache in DB
-						user.firstname = fname;
-						user.lastname = lname;
-						user.pictureUrl = body.profile.picture_url;
-						user.save(function (err) {
-							if (err) {
-								clog("Error saving user:", err);
-								return failure(err);
+					if (!user.firstname || !user.lastname || user.pictureUrl) {
+						// Missing info, so consult data.media.mit.edu
+						request.get('http://data.media.mit.edu/spm/contacts/json?username='+username, function (err, response, body) {
+							if (err || response.statusCode != "200") {
+								return clog("Got error getting recommendations:", response.statusCode, err);
 							}
-							clog("Successfully saved user");
-							saved();
+
+							try {
+								body = JSON.parse(body);
+							} catch (exception) {
+								return clog("Error parsing response body:", exception);
+							}
+							
+							if (body.error || !body.profile) {
+								return clog("Got error from data.media.mit.edu:", username, body.error, body.profile);
+							}
+
+							// Valid user, so cache in DB
+							user.firstname = fname;
+							user.lastname = lname;
+							user.pictureUrl = body.profile.picture_url;
+							user.save(function (err) {
+								if (err) {
+									clog("Error saving user:", err);
+									return failure(err);
+								}
+								clog("Successfully saved user");
+								saved();
+							});
 						});
-					});
+					} else {
+						clog("No web call necessary, already have the sponsor's info");
+					}
 					
 				});
 			})(result);

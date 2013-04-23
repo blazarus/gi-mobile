@@ -161,6 +161,26 @@ app.post('/user/location/update', function (req, res) {
 
 });
 
+app.get('/user/:username/location/update', function (req, res) {
+	validateUsername(req.param('username'), function (user) {
+		user.checkLocation(eventEmitter, function () {
+			User.findOne({ username: user.username}).populate('currloc').exec(function (err, user) {
+				if (err) {
+					clog("Error getting saved user to return:", err);
+					return es.send(500, "Error checking user's location");
+				}
+				res.json({ status: 'ok', user: user }); 
+
+			});
+		}, function () {
+			res.send(500, "Error checking user's location");
+		});
+	},
+	function (err) {
+		res.send(500, 'Could not validate username');
+	});
+});
+
 var validateUsername = function (uname, success, failure) {
 	// Check with ML if username is valid
 	// Also cache in DB
@@ -184,14 +204,14 @@ var validateUsername = function (uname, success, failure) {
 					newUser.save(function (err, savedUser) {
 						if (err) {
 							clog("Error saving ", uname, "in DB:", err);
-							failure();
+							failure("Error saving "+ uname+" in DB: " + err);
 						}
 						else clog("Saved user in DB:", newUser);
 
 						success(savedUser);
 					});
 				} else {
-					failure();
+					failure("Bad response from data.media.mit.edu");
 				}
 			});
 		} else {
@@ -887,11 +907,19 @@ eventEmitter.on('location_updated', function (user) {
 				if (err) return clog("Error getting username from socket.");
 				if (username == user.username) {
 					checkForMessage(socket, user);
+					pushLocationUpdate(socket, user);
 				}
 			});
 		})(socket);
 	}
 });
+
+var pushLocationUpdate = function (socket, user) {
+	User.findOne({ username: user.username }).populate('currloc').exec(function (err, user) {
+		if (err) return clog("Error finding user in DB", user);
+		socket.emit('location_updated', { user: user });
+	});
+};
 
 var checkForMessage = function (socket, user) {
 	// user.isStale();

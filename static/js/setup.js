@@ -135,6 +135,18 @@ window.App = {
 			App.unreadMsgs.unshift(new App.Models.Message(data.msg, { parse: true }));
 		});
 
+		App.socket.on('location_updated', function (data) {
+			console.log("Got location update:", data);
+			javascript:debugger;
+			if (data.user) {
+				var user = App.allUsers.get(data.user.username);
+				var loc = App.locations.get(data.user.currloc.screenid);
+				var tstamp = new Date(data.user.lastseen);
+				user.set('location', loc);
+				user.set('tstamp', tstamp);
+			}
+		});
+
 		return $.when(defferedMsgs, defferedCharms).then(
 			function () {
 				console.log("Fetched collections");
