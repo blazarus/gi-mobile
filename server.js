@@ -907,7 +907,7 @@ eventEmitter.on('location_updated', function (user) {
 				if (err) return clog("Error getting username from socket.");
 				if (username == user.username) {
 					checkForMessage(socket, user);
-					pushLocationUpdate(socket, user);
+					// pushLocationUpdate(socket, user);
 				}
 			});
 		})(socket);
