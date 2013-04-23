@@ -791,8 +791,11 @@ var updateCharmsForUser = function (user, successCallback) {
 		user.charms = [];
 		clog("Cleared user charms:", user.charms);
 		var updateUser = function (proj) {
-			user.charms.push(proj);
-			if (++count >= target) {
+			clog("Calling updateUser within updating charms. count:", count, target);
+			if (proj) {
+				user.charms.push(proj);			
+			}
+			if (count >= target) {
 				// Only save once all of the groups have been added
 				user.save(function (err) {
 					if (err) return clog("Error saving User:", err);
@@ -801,14 +804,22 @@ var updateCharmsForUser = function (user, successCallback) {
 				});
 			}
 		};
-
+		if (body.charms.length == 0) {
+			clog("user has no charms");
+			updateUser();
+		}
 		for (var i=0,project; project=body.charms[i]; i++) {
+			clog("Iterating through charmed projects:", project);
 			if ('id' in project && 'projectname' in project) {
 				clog("Project not already in charms, so add it");
 				(function (project) {
 					clog("Project:", project.id, project.projectname);
 					Project.findOne({ pid: project.id, name: project.projectname }, function (err, proj) {
-						if (err) return clog("Error trying to find project in DB:", err);
+						if (err) {
+							clog("Error trying to find project in DB:", err);
+							++count;
+							return updateUser();
+						}
 						if (!proj) {
 							// Need to create project
 							clog("Project was null, so create it..");
@@ -823,18 +834,21 @@ var updateCharmsForUser = function (user, successCallback) {
 									if (err || !location) {
 										clog("Error finding a location with name or screenid:", project.location, err);
 										// Skip this one if it doesn't have a valid location
-										return count++;
+										count++;
+										return updateUser();
 									}
 									proj.location = location;
 									proj.save(function (err) {
 										if (err) return clog("Error trying to save project in DB:", err);
-										clog(proj);									
+										clog(proj);	
+										count++;								
 										updateUser(proj);
 									});
 								});
 						} else {
 							// Project saved, but need to add it to location
 							clog("Found project in DB:", proj);
+							count++;
 							updateUser(proj);
 						}
 						
@@ -843,7 +857,9 @@ var updateCharmsForUser = function (user, successCallback) {
 				
 			} else {
 				// skip this one, but make sure to increase the count
+				clog("Project already in user charms");
 				count++;
+				updateUser();
 			}
 		}
 

@@ -19,7 +19,7 @@ db.once('open', function callback () {
 	Location.fetchAll();
 	Location.createSpecial();
 	User.fetchAll(function () {}, function () {});
-	User.fetchAllSponsors(function () {}, function () {});
+	// User.fetchAllSponsors(function () {}, function () {});
 	User.createSpecial(function () {}, function () {});
 
 	// newUser = new User({username: 'blazarus'})
