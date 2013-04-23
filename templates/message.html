@@ -1,8 +1,7 @@
 <div class="msg-header">
 	<h4 class="subject"><%= subject %></h4>
-	<span class="pull-right">Created: <%= createdAt %></span>
-	From: <%= sender.get('displayName') %><br />
-	To: <%= to.pluck('displayName').join(', ') %><br />
+	<div>From: <%= sender.get('displayName') %></div>
+	<div>To: <%= to.pluck('displayName').join(', ') %></div>
 	<% if (!(triggerLocs.length === 1 && triggerLocs.models[0].isNoneLoc())) { %>
 		Shown because you were detected at 
 		<% triggerLocs.each(function (loc, idx) { %>
@@ -10,6 +9,7 @@
 			<% if (idx !== triggerLocs.length-1) { %> or <% } %>
 		<% }) %>
 	<% } %>
+	<div>Created: <%= createdAt %></div>
 </div>
 <div class="msg-body well well-small">
 	<%= body %>
