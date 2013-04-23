@@ -364,6 +364,10 @@ App.Collections.Locations = Backbone.Collection.extend({
 
 	},
 
+	comparator: function (location) {
+		return location.id;
+	},
+
 	parse: function (response) {
 		return response.locs;
 	},

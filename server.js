@@ -436,7 +436,7 @@ var updateGroupsForLoc = function (location, successCallback, failureCallback) {
 	location.groups = [];
 
 	clog("Checking tagnet for groups,", url);
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err)  {
 			clog("Got error checking groups:", err);
 			return failureCallback("Got error checking groups:"+ err);
@@ -585,7 +585,7 @@ var updateProjectsForGroup = function (group, successCallback) {
 
 	var url = "http://tagnet.media.mit.edu/get_projects_by_group?groupid="+group.groupid;
 	clog("Checking tagnet for projects,", url);
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err)  return clog("Got error checking projects:", err);
 		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
 

@@ -33,12 +33,13 @@
 			<div class="span5"></div>
 		</div>
 		<label for="loc">Select a location:</label>
-		<select id="loc" name="loc" class="input-block-level"<%= message.isForAllLocs() ? 'disabled' : '' %>>
+		<input id="triggerLocs" name="triggerLocs" class="input-block-level" type="text" <%= message.isForAllLocs() ? 'disabled' : '' %>>
+		<!-- <select id="loc" name="loc" class="input-block-level"<%= message.isForAllLocs() ? 'disabled' : '' %>>
 			<option>--Select a location--</a>
 			<% locations.each( function (loc) { %> 
 				<option><%= loc.get('screenid') %></a>
 			<% }); %>
-		</select>
+		</select> -->
 		<ul id="triggerlocs-list">
 			<% message.get('triggerLocs').each( function (loc) { %> 
 				<% if (!loc.isNoneLoc()) { %> 

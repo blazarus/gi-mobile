@@ -182,7 +182,7 @@ UserSchema.methods.fetchProjectRecommendations = function (success, failure) {
 	var limit = 15;
 	var memberOrSponsor = this.isMember() ? "person" : "sponsor";
 	var url = "http://gi.media.mit.edu/luminoso2/match/projects?" + memberOrSponsor + "=" + this.username + "&limit=" + limit;
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err) {
 			clog("Got error getting recommendations:", err);
 			return failure(err);
@@ -469,7 +469,7 @@ ProjectSchema.methods.fetch = function (success, failure) {
 	clog("this project:", this);
 	var url = "http://tagnet.media.mit.edu/get_project_info?projectid=" + _this.pid;
 	clog("Checking tagnet for projects info,", url);
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err) {
 			clog("Got error checking projects:", err);
 			return failure("Got error checking projects:", err)
@@ -582,7 +582,7 @@ LocationSchema.statics.getNoneLoc = function (callback) {
 
 LocationSchema.statics.fetchAll = function () {
 	url = "http://tagnet.media.mit.edu/rfid/api/rfid_info";
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err)  return clog("Got error checking locations:", err);
 		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
 
@@ -615,7 +615,7 @@ LocationSchema.statics.fetchAll = function () {
 LocationSchema.methods.fetch = function (success, failure) {
 	var url = "http://data.media.mit.edu/pldb/locations/json/?screenID=" + this.screenid;
 	var _this = this;
-	request.get(url, function (err, response, body) {
+	request.get({url: url, timeout: 5000}, function (err, response, body) {
 		if (err)  return clog("Got error checking locations:", err);
 		if (response.statusCode != "200") return clog("Bad response code:", response.statusCode);
 

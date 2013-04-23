@@ -272,9 +272,12 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 		if (location.isNoneLoc()) this.navigate('/project-browser/');
 		location.fetch({
 			success: function (model, response, options) {
-				$(".main-content").html(App.projectBrowserView.$el);
-				App.projectBrowserView.showLoc(model);
-				loader.hide();
+				$(".main-content").fadeOut('slow', function () {
+					$(".main-content").html(App.projectBrowserView.$el);
+					App.projectBrowserView.showLoc(model);
+					$(this).fadeIn('slow');
+					loader.hide();
+				});
 			},
 			error: function (model, response, options) {
 				loader.hide();
@@ -288,9 +291,12 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 		var group = new App.Models.Group({ groupid: groupid });
 		group.fetch({
 			success: function (model, response, options) {
-				$(".main-content").html(App.projectBrowserView.$el);
-				App.projectBrowserView.showGroup(model);
-				loader.hide();
+				$(".main-content").fadeOut('slow', function () {
+					$(".main-content").html(App.projectBrowserView.$el);
+					App.projectBrowserView.showGroup(model);
+					$(this).fadeIn('slow');
+					loader.hide();
+				});
 			},
 			error: function (model, response, options) {
 				loader.hide();
@@ -304,9 +310,12 @@ App.Routers.ProjectBrowser = Backbone.Router.extend({
 		var project = new App.Models.Project({ pid: pid });
 		project.fetch({
 			success: function (model, response, options) {
-				$(".main-content").html(App.projectBrowserView.$el);
-				App.projectBrowserView.showProject(model);
-				loader.hide();
+				$(".main-content").fadeOut('slow', function () {
+					$(".main-content").html(App.projectBrowserView.$el);
+					App.projectBrowserView.showProject(model);
+					$(this).fadeIn('slow');
+					loader.hide();
+				});
 			},
 			error: function (model, response, options) {
 				loader.hide();

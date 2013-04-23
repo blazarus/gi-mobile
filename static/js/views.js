@@ -141,15 +141,6 @@ App.Views.NewMessageAlert = Backbone.View.extend({
 
 	newMessage: function (msg) {
 		if (App.phonegap) {
-			var alertDismissed = function () {
-				alert("got here yay");
-			};
-			navigator.notification.alert(
-				"You have a new message",
-				alertDismissed,
-				"GI Mobile",
-				"Ok"
-			);
 			// Vibrate twice for a second with 200 ms in between
 			navigator.notification.vibrate(1000);
 			setTimeout(function () { 
@@ -261,7 +252,6 @@ App.Views.PostMessage = Backbone.View.extend({
 		"click #resetform": "resetForm",
 		"click #recipients-list li": "removeRecipient",
 		"click #triggerlocs-list li": "removeLocation",
-		"change select": "addLoc",
 		"click :checkbox#toggle-allusers": "toggleAllRecipients",
 		"click :checkbox#toggle-alllocs": "toggleAllLocations",
 		"keyup input#subject": "updateSubject",
@@ -308,17 +298,61 @@ App.Views.PostMessage = Backbone.View.extend({
 				return item;
 			}
 		});
+
+		var collectionListFormatter = function(item, term) {
+			// A simple Underscore template for formatting each result
+			var compiled = _.template("<% print(hl(item.get('displayName'))) %>");
+			return compiled({
+				hl : $.proxy($.fn.multisuggest.highlighter, this, term),
+				item: item
+			});
+		};
+
+		var collectionInputFormatter = function(item) { return item.id; }
+		var collectionValueAttribute = function(item) { return item.id; }
+
+		var collectionFilter = function(collection, term) {
+			var matcher = new RegExp($.fn.multisuggest.escapeRegex(term), "i");
+			return collection.filter(function(item) {
+				return (matcher.test(item.get('name')) || matcher.test(item.id));
+			});
+		};
+
+		var locationUpdater = function (item) {
+			console.log("item:", item);
+			var loc = App.locations.get(item);
+			_this.message.get('triggerLocs').add(loc);
+			_this.render();
+			return item;
+		};
+
+		$("#triggerLocs").multisuggest({
+			sources: [
+				{
+					header: 'Locations',
+					type: 'backbone.collection',
+					data: new App.Collections.Locations(
+						App.locations.filter(function (loc) {
+							return !loc.isNoneLoc();
+						})
+					),
+					filter: collectionFilter,
+					listFormatter: collectionListFormatter,
+					inputFormatter: collectionInputFormatter,
+					valueAttribute: collectionValueAttribute
+				}
+			],
+			loadingIconClass: 'msuggest-loading',
+			noResultsText: 'No matching locations.',
+			enableDropdownMode: true,
+			delay: 100,
+			updater: locationUpdater
+		});	
 	},
 
 	removeRecipient: function (e) {
 		var username = $(e.currentTarget).attr('id');
 		this.message.get('to').remove(username);
-		this.render();
-	},
-
-	addLoc: function (e) {
-		var screenid = $(e.target).val();
-		this.message.get('triggerLocs').add(App.locations.get(screenid));
 		this.render();
 	},
 
