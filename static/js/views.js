@@ -462,7 +462,7 @@ App.Views.LoginView = Backbone.View.extend({
 	},
 
 	initialize: function () {
-
+		this.$("input:text").focus();
 	},
 
 	submitLogin: function (e) {

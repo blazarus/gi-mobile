@@ -19,6 +19,7 @@ db.once('open', function callback () {
 	Location.fetchAll();
 	Location.createSpecial();
 	User.fetchAll(function () {}, function () {});
+	User.fetchAllSponsors(function () {}, function () {});
 	User.createSpecial(function () {}, function () {});
 
 	// newUser = new User({username: 'blazarus'})
@@ -337,6 +338,87 @@ UserSchema.statics.fetchAll = function (success, failure) {
 						clog("Successfully saved user");
 						saved();
 					});
+				});
+			})(result);
+		}
+
+	});
+};
+
+UserSchema.statics.fetchAllSponsors = function (success, failure) {
+	var url = "http://data.media.mit.edu/spm/attendee-list/json/MEDIALABSPRING13";
+	request.get(url, function (err, response, body) {
+		if (err || response.statusCode != "200") {
+			clog("Got error getting recommendations:", response.statusCode, err);
+			return failure(err);
+		}
+
+		try {
+			body = JSON.parse(body);
+		} catch (exception) {
+			clog("Error parsing response body:", exception);
+			return failure(exception);
+		}
+		
+		if (body.error) {
+			clog("Got error from data.media.mit.edu:", body.error);
+			return failure(body.error);
+		}
+
+		var count = 0, target = body.length;
+
+		var saved = function () {
+			if (++count >= target) {
+				clog("Saved all sponsors");
+				return success();
+			}
+		}
+
+		for (var i=0, result; result=body[i]; i++) {
+			(function (result) {
+				var username = result.user_name;
+				var fname = result.first_name;
+				var lname = result.last_name;
+				User.findOne({ username: username }, function (err, user) {
+					if (err) {
+						clog("Error getting user from DB:", err);
+						return failure(err);
+					}
+					if (!user) {
+						// user is null so create it
+						user = new User({
+							username: username,
+						});
+					}
+					request.get('http://data.media.mit.edu/spm/contacts/json?username='+username, function (err, response, body) {
+						if (err || response.statusCode != "200") {
+							return clog("Got error getting recommendations:", response.statusCode, err);
+						}
+
+						try {
+							body = JSON.parse(body);
+						} catch (exception) {
+							return clog("Error parsing response body:", exception);
+						}
+						
+						if (body.error || !body.profile) {
+							return clog("Got error from data.media.mit.edu:", username, body.error, body.profile);
+						}
+
+						// Valid user, so cache in DB
+						user.firstname = fname;
+						user.lastname = lname;
+						user.pictureUrl = body.profile.picture_url;
+						user.save(function (err) {
+							if (err) {
+								clog("Error saving user:", err);
+								return failure(err);
+							}
+							clog("Successfully saved user");
+							saved();
+						});
+					});
+					
 				});
 			})(result);
 		}

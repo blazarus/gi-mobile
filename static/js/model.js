@@ -137,13 +137,9 @@ App.Models.User = Backbone.Model.extend({
 			clearInterval(this.intervalId);
 		});
 
-		if (this.get('firstname') && this.get('lastname')) {
-			this.set('fullname', this.get('firstname')+ " " + this.get('lastname'));
-		} else {
-			this.set('fullname', this.id);
-		}
-		var displayName = this.id === this.get('fullname') ? this.id : this.get('fullname') + " (" + this.id + ")";
-		this.set('displayName', displayName);
+		this.updateVirtuals();
+
+		this.on('change:firstname change:lastname', this.updateVirtuals);
 
 		var loc = App.locations.getNoneLoc();
 		this.set('location', loc);
@@ -158,6 +154,16 @@ App.Models.User = Backbone.Model.extend({
 			console.log("intervalId:", this.intervalId);
 			
 		}
+	},
+
+	updateVirtuals: function () {
+		if (this.get('firstname') && this.get('lastname')) {
+			this.set('fullname', this.get('firstname')+ " " + this.get('lastname'));
+		} else {
+			this.set('fullname', this.id);
+		}
+		var displayName = this.id === this.get('fullname') ? this.id : this.get('fullname') + " (" + this.id + ")";
+		this.set('displayName', displayName);
 	},
 
 	parse: function (resp) {
